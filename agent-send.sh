@@ -74,15 +74,18 @@ send_message() {
         # macOS: pbcopy/pbpaste使用
         echo -n "$message" | pbcopy
         tmux send-keys -t "$target" C-v
+        sleep 0.3
     elif command -v xclip >/dev/null 2>&1; then
         # Linux: xclip使用
         echo -n "$message" | xclip -selection clipboard
         tmux send-keys -t "$target" C-S-v
+        sleep 0.3
     else
         # クリップボードが使用できない場合は直接送信
         # tmuxのpaste-bufferを使用
         tmux set-buffer "$message"
         tmux paste-buffer -t "$target"
+        sleep 0.3
     fi
     
     # エンター押下で送信完了
