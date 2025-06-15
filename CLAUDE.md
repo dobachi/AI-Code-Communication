@@ -12,6 +12,8 @@
 
 ## 作業全体の基本フロー
 PRESIDENT → boss1 → workers → boss1 → PRESIDENT 
+PRESIDENTは自身で作業するだけではなく、boss1に依頼できることがないかを考えること。
+boss1は自身で作業するだけではなく、各workerに依頼できることがないかを考えること。
 
 ### 相互連携
 基本フローは上記の通りだが、Boss、Workerたちは相互に連絡を取り合いながら作業を進めること。
@@ -32,23 +34,44 @@ PRESIDENT → boss1 → workers → boss1 → PRESIDENT
 作業を始めるにあたり、プロジェクト名はPresidentが適切な名前を考えて名づけること。
 あるいは、過去に実施してたプロジェクトを再開する場合は、プロジェクトを名を受け付けるように質問すること。もし候補があればそれを述べること。
 
+### プロジェクト構造
+
+各プロジェクトは以下の構造で管理される：
+
+```
+projects/
+├── <プロジェクト名>/
+│   ├── workspace/          # 実際の作業ディレクトリ（git worktree対応）
+│   │   ├── president/      # president管理（メインリポジトリ）
+│   │   ├── boss1/         # boss1統合作業用worktree
+│   │   ├── worker1/       # worker1専用worktree
+│   │   ├── worker2/       # worker2専用worktree
+│   │   └── worker3/       # worker3専用worktree
+│   ├── checkpoint/        # プロジェクト専用チェックポイント
+│   │   └── YYYY-mm-DD_HHMMSS.md
+│   ├── instructions/      # プロジェクト固有指示書
+│   │   ├── project.md    # プロジェクト固有ルール
+│   │   └── roles/        # 役割別拡張指示
+│   ├── config/           # プロジェクト設定
+│   │   └── worktree.yaml # worktree設定
+│   └── shared/           # プロジェクト共有リソース
+│       ├── scripts/      # 共通スクリプト
+│       └── templates/    # テンプレート
+```
+
 ### 作業ディレクトリ
 
-ファイルやディレクトリを作成する際は、projectsディレクトリ以下に必ず当該プロジェクト用ワーキングディレクトリを作り、その中で実行すること。
-なお、基本的には作業中はprojects以下で完結するようにし、それより上のディレクトリは触らないこと。
+- **President**: `workspace/president/` でメインリポジトリを管理
+- **Boss1**: `workspace/boss1/` で統合作業を実施
+- **Workers**: `workspace/worker[1-3]/` で各自の担当機能を開発
+- 各worktreeは機能別ブランチで独立して作業可能
 
 ### 作業完了時のチェックポイント
 
 依頼に基づきPresidentが作業する際、作業終了時には、都度、Presidentは次回再開時に必要となる情報をまとめたチェックポイントファイルをまとめること。
 またチェックポイントファイル作成のために必要な情報がある場合には、適切にBossに依頼し、情報を集めること。
 Presidentは作業開始時にチェックポイントファイルがあれば、最新のチェックポイントを読んで理解してから着手すること。
-ファイルはprojects/checkpointというディレクトリに置き、以下のような構造を保つこと。
-
-```
-projects/checkpoint/
-  <プロジェクト名>/
-    <YYYY-mm-DD_HHMMSS.md>
-```
+ファイルは`projects/<プロジェクト名>/checkpoint/`ディレクトリに置く。
 
 ### 仮想環境
 

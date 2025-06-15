@@ -8,11 +8,12 @@ tmp/
 *.tmp
 *_done.txt
 
-# チェックポイントファイル
-checkpoint/
+# プロジェクト全体を除外（個別管理のため）
+projects/*
 
-# プロジェクト用ワーキングディレクトリ
-projects/
+# ただし共有リソースは管理対象として例外化
+!projects/README.md
+!projects/templates/
 
 # OS固有
 .DS_Store
