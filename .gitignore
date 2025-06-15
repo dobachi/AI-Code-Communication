@@ -8,6 +8,12 @@ tmp/
 *.tmp
 *_done.txt
 
+# チェックポイントファイル
+checkpoint/
+
+# プロジェクト用ワーキングディレクトリ
+projects/
+
 # OS固有
 .DS_Store
 Thumbs.db
