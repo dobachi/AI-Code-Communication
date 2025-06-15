@@ -57,11 +57,6 @@ cd projects/<プロジェクト名>
 ./shared/scripts/sync-with-remote.sh <プロジェクト名>
 ```
 
-## 既存プロジェクト
-
-- **dataspace-mcp**: データスペースMCPプロジェクト
-- **sovity-edc-demo**: EDCデモプロジェクト
-
 ## 使用方法
 
 各プロジェクトのREADMEとinstructions/を確認してください。
