@@ -31,7 +31,7 @@ cd Claude-Code-Communication
 
 #### 2️⃣ 環境構築（1分）
 ```bash
-./setup.sh
+./bin/setup
 ```
 これで4つのターミナル画面が自動で作られます！
 
@@ -88,13 +88,13 @@ done
 
 ### メッセージの送り方
 ```bash
-./agent-send.sh [相手の名前] "[メッセージ]"
+./bin/agent-send [相手の名前] "[メッセージ]"
 
 # 例：マネージャーに送る
-./agent-send.sh boss1 "新しいプロジェクトです"
+./bin/agent-send boss1 "新しいプロジェクトです"
 
 # 例：作業者1に送る
-./agent-send.sh worker1 "UIを作ってください"
+./bin/agent-send worker1 "UIを作ってください"
 ```
 
 ### 実際のやり取りの例
@@ -131,6 +131,12 @@ UIデザインの革新的アイデアを3つ以上提案してください。
 ```
 
 ## 📁 重要なファイルの説明
+
+### コマンドツール（bin/）
+ユーザー向けの実行コマンドです
+- **agent-send**: エージェント間メッセージ送信
+- **setup**: 環境セットアップ
+- **project-init**: 新規プロジェクト作成
 
 ### 指示書（instructions/）
 各エージェントの行動マニュアルです
@@ -182,7 +188,7 @@ UIデザインの革新的アイデアを3つ以上提案してください。
 - worker1,2,3: 実行担当
 
 ## メッセージ送信
-./agent-send.sh [相手] "[メッセージ]"
+./bin/agent-send [相手] "[メッセージ]"
 ```
 
 ## 🎨 実際に作られたもの：EmotiFlow
@@ -216,7 +222,7 @@ emotiflow-mvp/
 tmux ls
 
 # 再起動
-./setup.sh
+./bin/setup
 ```
 
 ### Q: メッセージが届かない
@@ -225,7 +231,7 @@ tmux ls
 cat logs/send_log.txt
 
 # 手動でテスト
-./agent-send.sh boss1 "テスト"
+./bin/agent-send boss1 "テスト"
 ```
 
 ### Q: 最初からやり直したい
@@ -233,10 +239,19 @@ cat logs/send_log.txt
 # 全部リセット
 tmux kill-server
 rm -rf ./tmp/*
-./setup.sh
+./bin/setup
 ```
 
 ## 🚀 自分のプロジェクトを作る
+
+### プロジェクトの作成
+```bash
+# 新しいプロジェクトを作成
+./bin/project-init my-new-project
+
+# Git管理を含める場合
+./bin/project-init my-project --git --remote git@github.com:user
+```
 
 ### 簡単な例：TODOアプリを作る
 
@@ -331,8 +346,8 @@ TODOアプリを作ってください。
 
 **新しい作業者を追加：**
 1. `instructions/worker4.md`を作成
-2. `setup.sh`を編集してペインを追加
-3. `agent-send.sh`にマッピングを追加
+2. `bin/setup`を編集してペインを追加
+3. `bin/agent-send`にマッピングを追加
 
 **タイマーを変更：**
 ```bash
