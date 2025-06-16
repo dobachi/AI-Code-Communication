@@ -6,9 +6,26 @@
 - **WORKER1,2,3** (MULTIAGENT:0.1-3): 実行担当
 
 ## あなたの役割
-- **president**: @instructions/president.md
-- **boss1**: @instructions/boss.md
-- **worker1,2,3**: @instructions/worker.md
+- **president**: @instructions/challenge/president.md
+- **boss1**: @instructions/challenge/boss.md
+- **worker1,2,3**: @instructions/challenge/worker.md
+
+## 指示書モード
+2つの指示書モードから選択可能：
+- **challenge**: 創造的・革新的アプローチ（実験的プロジェクト、ブレインストーミング向け）
+- **stable**: 堅実・効率的アプローチ（本番プロジェクト、期限重視向け）
+
+モード切り替え：
+```bash
+# チャレンジ型に切り替え
+./instructions/select.sh challenge
+
+# 安定型に切り替え
+./instructions/select.sh stable
+
+# 現在のモード確認
+./instructions/select.sh status
+```
 
 ## 作業全体の基本フロー
 PRESIDENT → boss1 → workers → boss1 → PRESIDENT 
@@ -24,7 +41,7 @@ boss1は自身で作業するだけではなく、各workerに依頼できるこ
 関係者間の連絡には以下のメッセージ送信ツールを使用できる。
 メッセージには改行も含めることができる。
 ```bash
-./agent-send.sh [相手] "[メッセージ]"
+./bin/agent-send [相手] "[メッセージ]"
 ```
 
 ## プロジェクトを進める上での注意事項
