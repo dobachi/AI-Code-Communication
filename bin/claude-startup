@@ -80,7 +80,7 @@ success "President認証完了"
 info "🤖 Step 2: Multiagent一括起動を開始..."
 
 for i in {0..3}; do
-    local session="multiagent:0.$i"
+    session="multiagent:0.$i"
     info "  Starting $session..."
     tmux send-keys -t $session 'claude --dangerously-skip-permissions' C-m
     
