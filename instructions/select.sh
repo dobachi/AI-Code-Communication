@@ -26,7 +26,7 @@ USAGE:
 
 MODES:
     challenge    Use challenge-type instructions (creative, innovative)
-    stable       Use stable-type instructions (reliable, efficient)
+    stable       Use minimal-type instructions (simple, fast, bare minimum)
     status       Show current instruction mode
 
 OPTIONS:
@@ -99,9 +99,9 @@ show_status() {
             echo "Best for: Experimental projects, brainstorming, innovation"
             ;;
         stable)
-            echo -e "Current mode: ${GREEN}STABLE${NC} 🎯"
-            echo "Description: Reliable, efficient, systematic approach"
-            echo "Best for: Production projects, deadlines, stability"
+            echo -e "Current mode: ${GREEN}MINIMAL${NC} 🎯"
+            echo "Description: Simple, fast, bare minimum approach"
+            echo "Best for: Quick prototypes, basic functionality, minimal viable products"
             ;;
         unknown)
             echo -e "Current mode: ${RED}UNKNOWN${NC} ❓"
@@ -116,7 +116,7 @@ show_status() {
     echo
     echo -e "${BLUE}Available instruction sets:${NC}"
     echo "  challenge/  - Creative and innovative instructions"
-    echo "  stable/     - Reliable and systematic instructions"
+    echo "  stable/     - Minimal and fast instructions"
 }
 
 # Main logic
@@ -185,11 +185,11 @@ if [[ "$new_mode" == "$MODE" ]]; then
             echo "  • Best for: brainstorming, innovation, experimentation"
             ;;
         stable)
-            echo -e "${GREEN}🎯 STABLE MODE ACTIVATED${NC}"
-            echo "  • Reliable and systematic approach"
-            echo "  • Efficient and proven methods"
-            echo "  • Quality and deadline focused"
-            echo "  • Best for: production, deadlines, mission-critical projects"
+            echo -e "${GREEN}🎯 MINIMAL MODE ACTIVATED${NC}"
+            echo "  • Simple and fast approach"
+            echo "  • Bare minimum functionality"
+            echo "  • Single-file implementation preferred"
+            echo "  • Best for: prototypes, MVPs, quick solutions"
             ;;
     esac
     
