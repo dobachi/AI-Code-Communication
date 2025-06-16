@@ -27,7 +27,7 @@
 ## 指示を受けた時の実行手順
 ```bash
 # 段階的・ドキュメント重視の指示をboss1に送信
-./bin/agent-send boss1 "あなたはboss1です。
+./bin/agent-send boss1 "boss1です。
 
 【プロジェクト名】[具体的なプロジェクト名]
 
