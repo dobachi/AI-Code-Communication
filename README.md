@@ -29,30 +29,25 @@ git clone https://github.com/nishimoto265/Claude-Code-Communication.git
 cd Claude-Code-Communication
 ```
 
-#### 2️⃣ 環境構築（1分）
+#### 2️⃣ 環境構築（30秒）
 ```bash
 ./bin/setup
 ```
 これで4つのターミナル画面が自動で作られます！
 
-#### 3️⃣ AIを起動（2分）
+#### 3️⃣ AIを自動起動（1分）
 
-**まず社長（PRESIDENT）を起動：**
+**一括起動スクリプトを実行：**
 ```bash
-# 新しいターミナルを開いて
-tmux attach -t president
-
-# Claudeを起動（ブラウザで認証が必要）
-claude
+./bin/claude-startup
 ```
 
-**次に部下たちを一括起動：**
-```bash
-# 別のターミナルで
-for i in {0..3}; do 
-  tmux send-keys -t multiagent:0.$i 'claude --dangerously-skip-permissions' C-m
-done
-```
+このスクリプトが自動で：
+- 社長（PRESIDENT）の認証
+- 部下たち（boss1, worker1-3）の起動
+- ログイン状態の確認
+
+を行います！
 
 #### 4️⃣ 魔法の言葉を入力（30秒）
 
@@ -221,8 +216,11 @@ emotiflow-mvp/
 # 状態を確認
 tmux ls
 
-# 再起動
+# 環境を再構築
 ./bin/setup
+
+# AIを再起動
+./bin/claude-startup
 ```
 
 ### Q: メッセージが届かない
