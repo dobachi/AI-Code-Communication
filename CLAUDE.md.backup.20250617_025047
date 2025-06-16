@@ -6,9 +6,9 @@
 - **WORKER1,2,3** (MULTIAGENT:0.1-3): 実行担当
 
 ## あなたの役割
-- **president**: @instructions/challenge/president.md
-- **boss1**: @instructions/challenge/boss.md
-- **worker1,2,3**: @instructions/challenge/worker.md
+- **president**: @instructions/iterative/president.md
+- **boss1**: @instructions/iterative/boss.md
+- **worker1,2,3**: @instructions/iterative/worker.md
 
 ## 指示書モード
 3つの指示書モードから選択可能：

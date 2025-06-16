@@ -19,16 +19,16 @@
 モード切り替え：
 ```bash
 # チャレンジ型に切り替え
-./bin/instructions-select challenge
+./instructions/select.sh challenge
 
 # 最小限型に切り替え
-./bin/instructions-select stable
+./instructions/select.sh stable
 
 # 段階型に切り替え
-./bin/instructions-select iterative
+./instructions/select.sh iterative
 
 # 現在のモード確認
-./bin/instructions-select status
+./instructions/select.sh status
 ```
 
 ## 作業全体の基本フロー

@@ -7,6 +7,7 @@ Executable commands for Claude Code Communication project.
 - **agent-send**: Send messages between team agents
 - **setup**: Initial project setup
 - **project-init**: Create new empty project with standard structure
+- **instructions-select**: Switch between instruction modes (challenge/stable/iterative)
 
 ## Usage
 
@@ -21,4 +22,5 @@ Or run directly:
 ```bash
 ./bin/agent-send boss1 "Hello"
 ./bin/setup
+./bin/instructions-select challenge
 ```

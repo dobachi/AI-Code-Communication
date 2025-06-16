@@ -13,8 +13,9 @@ NC='\033[0m' # No Color
 
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTRUCTIONS_DIR="$SCRIPT_DIR"
-CLAUDE_MD_PATH="$(dirname "$SCRIPT_DIR")/CLAUDE.md"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+INSTRUCTIONS_DIR="$PROJECT_ROOT/instructions"
+CLAUDE_MD_PATH="$PROJECT_ROOT/CLAUDE.md"
 
 # Help function
 show_help() {
@@ -22,7 +23,7 @@ show_help() {
 🔧 Claude Code Communication - Instructions Selector
 
 USAGE:
-    ./instructions/select.sh <mode> [options]
+    ./bin/instructions-select <mode> [options]
 
 MODES:
     challenge    Use challenge-type instructions (creative, innovative)
@@ -34,10 +35,10 @@ OPTIONS:
     -h, --help   Show this help message
 
 EXAMPLES:
-    ./instructions/select.sh challenge
-    ./instructions/select.sh stable
-    ./instructions/select.sh iterative
-    ./instructions/select.sh status
+    ./bin/instructions-select challenge
+    ./bin/instructions-select stable
+    ./bin/instructions-select iterative
+    ./bin/instructions-select status
 
 The script will update CLAUDE.md to reference the selected instruction set.
 EOF
