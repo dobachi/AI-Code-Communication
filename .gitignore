@@ -8,6 +8,9 @@ tmp/
 *.tmp
 *_done.txt
 
+# バックアップファイル
+backups/
+
 # プロジェクト全体を除外（個別管理のため）
 projects/*
 
