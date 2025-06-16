@@ -11,9 +11,10 @@
 - **worker1,2,3**: @instructions/challenge/worker.md
 
 ## 指示書モード
-2つの指示書モードから選択可能：
+3つの指示書モードから選択可能：
 - **challenge**: 創造的・革新的アプローチ（実験的プロジェクト、ブレインストーミング向け）
 - **stable**: 最小限・高速アプローチ（プロトタイプ、MVP、シンプルな解決策向け）
+- **iterative**: 段階的・ドキュメント重視アプローチ（ユーザー中心、アジャイル開発向け）
 
 モード切り替え：
 ```bash
@@ -22,6 +23,9 @@
 
 # 最小限型に切り替え
 ./instructions/select.sh stable
+
+# 段階型に切り替え
+./instructions/select.sh iterative
 
 # 現在のモード確認
 ./instructions/select.sh status

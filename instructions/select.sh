@@ -27,6 +27,7 @@ USAGE:
 MODES:
     challenge    Use challenge-type instructions (creative, innovative)
     stable       Use minimal-type instructions (simple, fast, bare minimum)
+    iterative    Use iterative-type instructions (agile, documented, user-focused)
     status       Show current instruction mode
 
 OPTIONS:
@@ -35,6 +36,7 @@ OPTIONS:
 EXAMPLES:
     ./instructions/select.sh challenge
     ./instructions/select.sh stable
+    ./instructions/select.sh iterative
     ./instructions/select.sh status
 
 The script will update CLAUDE.md to reference the selected instruction set.
@@ -48,6 +50,8 @@ check_current_mode() {
             echo "challenge"
         elif grep -q "@instructions/stable/" "$CLAUDE_MD_PATH" 2>/dev/null; then
             echo "stable"
+        elif grep -q "@instructions/iterative/" "$CLAUDE_MD_PATH" 2>/dev/null; then
+            echo "iterative"
         else
             echo "unknown"
         fi
@@ -72,15 +76,24 @@ update_claude_md() {
     case "$mode" in
         challenge)
             sed -i 's|@instructions/stable/|@instructions/challenge/|g' "$CLAUDE_MD_PATH"
+            sed -i 's|@instructions/iterative/|@instructions/challenge/|g' "$CLAUDE_MD_PATH"
             sed -i 's|@instructions/president\.md|@instructions/challenge/president.md|g' "$CLAUDE_MD_PATH"
             sed -i 's|@instructions/boss\.md|@instructions/challenge/boss.md|g' "$CLAUDE_MD_PATH"
             sed -i 's|@instructions/worker\.md|@instructions/challenge/worker.md|g' "$CLAUDE_MD_PATH"
             ;;
         stable)
             sed -i 's|@instructions/challenge/|@instructions/stable/|g' "$CLAUDE_MD_PATH"
+            sed -i 's|@instructions/iterative/|@instructions/stable/|g' "$CLAUDE_MD_PATH"
             sed -i 's|@instructions/president\.md|@instructions/stable/president.md|g' "$CLAUDE_MD_PATH"
             sed -i 's|@instructions/boss\.md|@instructions/stable/boss.md|g' "$CLAUDE_MD_PATH"
             sed -i 's|@instructions/worker\.md|@instructions/stable/worker.md|g' "$CLAUDE_MD_PATH"
+            ;;
+        iterative)
+            sed -i 's|@instructions/challenge/|@instructions/iterative/|g' "$CLAUDE_MD_PATH"
+            sed -i 's|@instructions/stable/|@instructions/iterative/|g' "$CLAUDE_MD_PATH"
+            sed -i 's|@instructions/president\.md|@instructions/iterative/president.md|g' "$CLAUDE_MD_PATH"
+            sed -i 's|@instructions/boss\.md|@instructions/iterative/boss.md|g' "$CLAUDE_MD_PATH"
+            sed -i 's|@instructions/worker\.md|@instructions/iterative/worker.md|g' "$CLAUDE_MD_PATH"
             ;;
     esac
 }
@@ -103,6 +116,11 @@ show_status() {
             echo "Description: Simple, fast, bare minimum approach"
             echo "Best for: Quick prototypes, basic functionality, minimal viable products"
             ;;
+        iterative)
+            echo -e "Current mode: ${BLUE}ITERATIVE${NC} 🔄"
+            echo "Description: Agile, documented, user-focused development"
+            echo "Best for: User-centered projects, documentation-heavy, long-term development"
+            ;;
         unknown)
             echo -e "Current mode: ${RED}UNKNOWN${NC} ❓"
             echo "CLAUDE.md exists but mode cannot be determined"
@@ -117,6 +135,7 @@ show_status() {
     echo -e "${BLUE}Available instruction sets:${NC}"
     echo "  challenge/  - Creative and innovative instructions"
     echo "  stable/     - Minimal and fast instructions"
+    echo "  iterative/  - Agile and documented instructions"
 }
 
 # Main logic
@@ -132,11 +151,11 @@ case "$MODE" in
         show_status
         exit 0
         ;;
-    challenge|stable)
+    challenge|stable|iterative)
         # Validate instruction directories exist
         if [[ ! -d "$INSTRUCTIONS_DIR/$MODE" ]]; then
             echo -e "${RED}Error: Instruction directory '$MODE' not found${NC}" >&2
-            echo "Available: challenge, stable"
+            echo "Available: challenge, stable, iterative"
             exit 1
         fi
         
@@ -155,7 +174,7 @@ case "$MODE" in
         ;;
     *)
         echo -e "${RED}Error: Unknown mode '$MODE'${NC}" >&2
-        echo "Available modes: challenge, stable, status"
+        echo "Available modes: challenge, stable, iterative, status"
         echo "Use --help for usage information."
         exit 1
         ;;
@@ -190,6 +209,13 @@ if [[ "$new_mode" == "$MODE" ]]; then
             echo "  • Bare minimum functionality"
             echo "  • Single-file implementation preferred"
             echo "  • Best for: prototypes, MVPs, quick solutions"
+            ;;
+        iterative)
+            echo -e "${BLUE}🔄 ITERATIVE MODE ACTIVATED${NC}"
+            echo "  • Agile development with user feedback loops"
+            echo "  • Documentation-driven development"
+            echo "  • Staged feature delivery"
+            echo "  • Best for: user-centered projects, long-term development"
             ;;
     esac
     
