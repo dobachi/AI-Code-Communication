@@ -71,7 +71,8 @@ update_claude_md() {
     fi
     
     # Create backup
-    cp "$CLAUDE_MD_PATH" "${CLAUDE_MD_PATH}.backup.$(date +%Y%m%d_%H%M%S)"
+    mkdir -p "$PROJECT_ROOT/backups/claude-md"
+    cp "$CLAUDE_MD_PATH" "$PROJECT_ROOT/backups/claude-md/CLAUDE.md.backup.$(date +%Y%m%d_%H%M%S)"
     
     # Update instruction references
     case "$mode" in
@@ -224,7 +225,7 @@ if [[ "$new_mode" == "$MODE" ]]; then
     echo -e "${BLUE}📝 CLAUDE.md has been updated${NC}"
     echo "  Previous mode: $current_mode"
     echo "  New mode: $new_mode"
-    echo "  Backup created: CLAUDE.md.backup.$(date +%Y%m%d_%H%M%S)"
+    echo "  Backup created: backups/claude-md/CLAUDE.md.backup.$(date +%Y%m%d_%H%M%S)"
     
 else
     echo -e "${RED}❌ Failed to switch mode${NC}" >&2
