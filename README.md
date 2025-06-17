@@ -2,6 +2,10 @@
 
 複数のAIが協力して働く、まるで会社のような開発システムです
 
+## 🙏 謝辞
+
+このプロジェクトは、[Akira-Papa](https://github.com/Akira-Papa)さんと[nishimoto265](https://github.com/nishimoto265)さんの[Claude-Code-Communication](https://github.com/Akira-Papa/Claude-Code-Communication)から着想を得て開発されました。複数のAIエージェントが協調して作業するという革新的なアイデアに感謝します。
+
 ## 📌 これは何？
 
 **3行で説明すると：**
