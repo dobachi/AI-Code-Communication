@@ -27,4 +27,10 @@ Thumbs.db
 *.swo
 *~
 .vscode/
-.idea/ 
+.idea/
+
+# プロジェクトコンテキストファイル
+.current-project 
+
+# AI
+.claude/

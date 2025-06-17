@@ -1,9 +1,26 @@
 #!/bin/bash
 
 # Claude Code 段階的起動スクリプト（ログイン対応版）
-# Usage: ./bin/claude-startup
+# Usage: ./bin/claude-startup [project-name]
 
 set -e
+
+# プロジェクト名を引数から取得
+PROJECT_NAME="$1"
+SESSION_PREFIX=""
+
+# プロジェクト名が指定された場合はプレフィックスを設定
+if [ -n "$PROJECT_NAME" ]; then
+    SESSION_PREFIX="${PROJECT_NAME}-"
+elif [ -f ".current-project" ]; then
+    # .current-projectファイルからプロジェクト名を読み込み
+    PROJECT_NAME=$(cat .current-project)
+    SESSION_PREFIX="${PROJECT_NAME}-"
+fi
+
+# セッション名の定義
+PRESIDENT_SESSION="${SESSION_PREFIX}president"
+MULTIAGENT_SESSION="${SESSION_PREFIX}multiagent"
 
 # 色付きメッセージ関数
 info() { echo -e "\e[34m[INFO]\e[0m $1"; }
@@ -60,15 +77,18 @@ assist_login() {
 }
 
 info "🚀 Claude Code段階的起動を開始します..."
+if [ -n "$PROJECT_NAME" ]; then
+    info "📁 プロジェクト: $PROJECT_NAME"
+fi
 
 # 手順1: President認証
 info "📋 Step 1: President認証を開始..."
-tmux send-keys -t president 'claude --dangerously-skip-permissions' C-m
+tmux send-keys -t "$PRESIDENT_SESSION" 'claude --dangerously-skip-permissions' C-m
 
 # President認証状態確認
 sleep 5
-if ! check_login_status "president"; then
-    if ! assist_login "president"; then
+if ! check_login_status "$PRESIDENT_SESSION"; then
+    if ! assist_login "$PRESIDENT_SESSION"; then
         error "President認証に失敗しました"
         exit 1
     fi
@@ -80,7 +100,7 @@ success "President認証完了"
 info "🤖 Step 2: Multiagent一括起動を開始..."
 
 for i in {0..3}; do
-    session="multiagent:0.$i"
+    session="${MULTIAGENT_SESSION}:0.$i"
     info "  Starting $session..."
     tmux send-keys -t $session 'claude --dangerously-skip-permissions' C-m
     
@@ -96,10 +116,10 @@ done
 success "✅ Claude Code一括起動完了！"
 echo ""
 info "📝 セッション確認："
-echo "  President: tmux attach -t president"
-echo "  Boss1:     tmux attach -t multiagent:0.0"
-echo "  Worker1:   tmux attach -t multiagent:0.1"
-echo "  Worker2:   tmux attach -t multiagent:0.2"
-echo "  Worker3:   tmux attach -t multiagent:0.3"
+echo "  President: tmux attach -t $PRESIDENT_SESSION"
+echo "  Boss1:     tmux attach -t ${MULTIAGENT_SESSION}:0.0"
+echo "  Worker1:   tmux attach -t ${MULTIAGENT_SESSION}:0.1"
+echo "  Worker2:   tmux attach -t ${MULTIAGENT_SESSION}:0.2"
+echo "  Worker3:   tmux attach -t ${MULTIAGENT_SESSION}:0.3"
 echo ""
 info "🔧 ログインが必要なセッションがある場合は、上記コマンドで個別に接続してください"

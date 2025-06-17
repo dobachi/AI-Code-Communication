@@ -2,14 +2,25 @@
 
 # 🚀 Agent間メッセージ送信スクリプト
 
-# エージェント→tmuxターゲット マッピング
+# プロジェクトコンテキストの取得
+get_project_prefix() {
+    if [ -f ".current-project" ]; then
+        local project=$(cat .current-project)
+        echo "${project}-"
+    else
+        echo ""
+    fi
+}
+
+# エージェント→tmuxターゲット マッピング（プロジェクト対応）
 get_agent_target() {
+    local prefix=$(get_project_prefix)
     case "$1" in
-        "president") echo "president" ;;
-        "boss1") echo "multiagent:0.0" ;;
-        "worker1") echo "multiagent:0.1" ;;
-        "worker2") echo "multiagent:0.2" ;;
-        "worker3") echo "multiagent:0.3" ;;
+        "president") echo "${prefix}president" ;;
+        "boss1") echo "${prefix}multiagent:0.0" ;;
+        "worker1") echo "${prefix}multiagent:0.1" ;;
+        "worker2") echo "${prefix}multiagent:0.2" ;;
+        "worker3") echo "${prefix}multiagent:0.3" ;;
         *) echo "" ;;
     esac
 }
@@ -38,13 +49,20 @@ EOF
 
 # エージェント一覧表示
 show_agents() {
-    echo "📋 利用可能なエージェント:"
+    local prefix=$(get_project_prefix)
+    local project_info=""
+    
+    if [ -n "$prefix" ]; then
+        project_info=" (プロジェクト: ${prefix%%-})"
+    fi
+    
+    echo "📋 利用可能なエージェント${project_info}:"
     echo "=========================="
-    echo "  president → president:0     (プロジェクト統括責任者)"
-    echo "  boss1     → multiagent:0.0  (チームリーダー)"
-    echo "  worker1   → multiagent:0.1  (実行担当者A)"
-    echo "  worker2   → multiagent:0.2  (実行担当者B)" 
-    echo "  worker3   → multiagent:0.3  (実行担当者C)"
+    echo "  president → ${prefix}president:0     (プロジェクト統括責任者)"
+    echo "  boss1     → ${prefix}multiagent:0.0  (チームリーダー)"
+    echo "  worker1   → ${prefix}multiagent:0.1  (実行担当者A)"
+    echo "  worker2   → ${prefix}multiagent:0.2  (実行担当者B)" 
+    echo "  worker3   → ${prefix}multiagent:0.3  (実行担当者C)"
 }
 
 # ログ記録

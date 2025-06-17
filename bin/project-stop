@@ -1,0 +1,204 @@
+#!/bin/bash
+
+# 🛑 プロジェクト対応tmuxセッション停止スクリプト
+# Usage: ./bin/project-stop [project-name|--all|--current]
+#
+# ⚠️  廃止予定: このスクリプトは廃止予定です
+# 📌 代わりに './bin/project stop' を使用してください
+#
+
+set -e
+
+# 廃止予定の警告を表示
+echo -e "\e[33m[WARNING]\e[0m このコマンドは廃止予定です。代わりに './bin/project stop' を使用してください。" >&2
+echo "" >&2
+
+# 色付きメッセージ関数
+info() { echo -e "\e[34m[INFO]\e[0m $1"; }
+success() { echo -e "\e[32m[SUCCESS]\e[0m $1"; }
+warning() { echo -e "\e[33m[WARNING]\e[0m $1"; }
+error() { echo -e "\e[31m[ERROR]\e[0m $1"; }
+
+# プロジェクトコンテキストの取得
+get_current_project() {
+    if [ -f ".current-project" ]; then
+        cat .current-project
+    else
+        echo ""
+    fi
+}
+
+# 使用方法表示
+show_usage() {
+    cat << EOF
+🛑 プロジェクト対応tmuxセッション停止
+
+使用方法:
+  $0 [プロジェクト名]   # 指定プロジェクトのセッションを停止
+  $0 --current         # 現在のプロジェクトのセッションを停止
+  $0 --all             # 全てのプロジェクトセッションを停止
+  $0 --list            # 実行中のプロジェクトセッション一覧
+
+例:
+  $0 myproject         # myprojectのセッションを停止
+  $0 --current         # 現在のプロジェクトを停止
+  $0 --all             # 全プロジェクトを停止
+
+注意:
+  - セッション内のClaude Codeプロセスも終了します
+  - 作業内容は各プロジェクトのworkspaceに保存されています
+EOF
+}
+
+# 実行中のプロジェクトセッション一覧
+list_project_sessions() {
+    info "実行中のプロジェクトセッション:"
+    echo "=================================="
+    
+    local found=false
+    
+    # プロジェクト付きセッションを検索
+    tmux list-sessions 2>/dev/null | grep -E '.*-(multiagent|president)' | \
+    sed -E 's/^(.*)-(multiagent|president):.*/\1/' | sort -u | \
+    while read project; do
+        found=true
+        echo "📁 $project"
+        tmux has-session -t "${project}-multiagent" 2>/dev/null && echo "  - ${project}-multiagent"
+        tmux has-session -t "${project}-president" 2>/dev/null && echo "  - ${project}-president"
+    done
+    
+    # デフォルトセッション確認
+    if tmux has-session -t multiagent 2>/dev/null || \
+       tmux has-session -t president 2>/dev/null; then
+        found=true
+        echo ""
+        echo "📦 デフォルト（プロジェクトなし）"
+        tmux has-session -t multiagent 2>/dev/null && echo "  - multiagent"
+        tmux has-session -t president 2>/dev/null && echo "  - president"
+    fi
+    
+    if [ "$found" = false ]; then
+        info "実行中のセッションはありません"
+    fi
+}
+
+# セッション停止確認
+confirm_stop() {
+    local message="$1"
+    
+    warning "$message"
+    read -p "本当に停止しますか？ (y/N): " -n 1 -r
+    echo ""
+    
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        info "キャンセルしました"
+        return 1
+    fi
+    
+    return 0
+}
+
+# プロジェクトセッション停止
+stop_project_sessions() {
+    local project="$1"
+    local prefix=""
+    
+    if [ -n "$project" ]; then
+        prefix="${project}-"
+    fi
+    
+    local stopped=false
+    
+    # multiagentセッション停止
+    if tmux has-session -t "${prefix}multiagent" 2>/dev/null; then
+        info "${prefix}multiagentセッションを停止中..."
+        tmux kill-session -t "${prefix}multiagent"
+        success "${prefix}multiagentセッションを停止しました"
+        stopped=true
+    fi
+    
+    # presidentセッション停止
+    if tmux has-session -t "${prefix}president" 2>/dev/null; then
+        info "${prefix}presidentセッションを停止中..."
+        tmux kill-session -t "${prefix}president"
+        success "${prefix}presidentセッションを停止しました"
+        stopped=true
+    fi
+    
+    if [ "$stopped" = false ]; then
+        if [ -n "$project" ]; then
+            info "プロジェクト '$project' のセッションは実行されていません"
+        else
+            info "デフォルトセッションは実行されていません"
+        fi
+    fi
+}
+
+# 全プロジェクトセッション停止
+stop_all_sessions() {
+    info "全プロジェクトセッションを検索中..."
+    
+    local sessions=()
+    
+    # プロジェクトセッションを収集
+    while IFS= read -r session; do
+        if [[ "$session" =~ -(multiagent|president) ]]; then
+            sessions+=("$session")
+        fi
+    done < <(tmux list-sessions -F "#{session_name}" 2>/dev/null || true)
+    
+    # デフォルトセッションも追加
+    tmux has-session -t multiagent 2>/dev/null && sessions+=("multiagent")
+    tmux has-session -t president 2>/dev/null && sessions+=("president")
+    
+    if [ ${#sessions[@]} -eq 0 ]; then
+        info "停止するセッションがありません"
+        return
+    fi
+    
+    # 停止処理
+    for session in "${sessions[@]}"; do
+        info "セッション '$session' を停止中..."
+        tmux kill-session -t "$session"
+        success "セッション '$session' を停止しました"
+    done
+    
+    success "全てのプロジェクトセッションを停止しました"
+}
+
+# メイン処理
+main() {
+    case "$1" in
+        --list)
+            list_project_sessions
+            ;;
+        --current)
+            local current=$(get_current_project)
+            if [ -z "$current" ]; then
+                if confirm_stop "現在のプロジェクトが設定されていません。デフォルトセッションを停止しますか？"; then
+                    stop_project_sessions ""
+                fi
+            else
+                if confirm_stop "プロジェクト '$current' のセッションを停止しますか？"; then
+                    stop_project_sessions "$current"
+                fi
+            fi
+            ;;
+        --all)
+            if confirm_stop "全てのプロジェクトセッションを停止しますか？"; then
+                stop_all_sessions
+            fi
+            ;;
+        --help|-h|"")
+            show_usage
+            ;;
+        *)
+            # プロジェクト名指定
+            if confirm_stop "プロジェクト '$1' のセッションを停止しますか？"; then
+                stop_project_sessions "$1"
+            fi
+            ;;
+    esac
+}
+
+main "$@"

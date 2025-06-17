@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# 🔄 プロジェクト切り替えスクリプト
+# Usage: ./bin/project-switch [project-name]
+#
+# ⚠️  廃止予定: このスクリプトは廃止予定です
+# 📌 代わりに './bin/project switch' を使用してください
+#
+
+set -e
+
+# 廃止予定の警告を表示
+echo -e "\e[33m[WARNING]\e[0m このコマンドは廃止予定です。代わりに './bin/project switch' を使用してください。" >&2
+echo "" >&2
+
+# 色付きメッセージ関数
+info() { echo -e "\e[34m[INFO]\e[0m $1"; }
+success() { echo -e "\e[32m[SUCCESS]\e[0m $1"; }
+error() { echo -e "\e[31m[ERROR]\e[0m $1"; }
+
+# 使用方法表示
+show_usage() {
+    cat << EOF
+🔄 プロジェクト切り替え
+
+使用方法:
+  $0 [プロジェクト名]    # 指定プロジェクトに切り替え
+  $0 --list            # アクティブなプロジェクトセッション一覧
+  $0 --current         # 現在のプロジェクトを表示
+  $0 --clear           # プロジェクトコンテキストをクリア
+
+例:
+  $0 myproject         # myprojectに切り替え
+  $0 --list           # 実行中のプロジェクト一覧を表示
+EOF
+}
+
+# 現在のプロジェクト表示
+show_current() {
+    if [ -f ".current-project" ]; then
+        local current=$(cat .current-project)
+        info "現在のプロジェクト: $current"
+    else
+        info "現在のプロジェクト: なし（デフォルト）"
+    fi
+}
+
+# アクティブなプロジェクトセッション一覧
+list_projects() {
+    info "アクティブなプロジェクトセッション:"
+    echo "=================================="
+    
+    # プロジェクト付きセッションを検索
+    tmux list-sessions 2>/dev/null | grep -E '.*-(multiagent|president)' | \
+    sed -E 's/^(.*)-(multiagent|president):.*/\1/' | sort -u | \
+    while read project; do
+        echo "  📁 $project"
+        echo "     - ${project}-multiagent"
+        echo "     - ${project}-president"
+    done
+    
+    # デフォルトセッション確認
+    if tmux has-session -t multiagent 2>/dev/null || \
+       tmux has-session -t president 2>/dev/null; then
+        echo ""
+        echo "  📦 デフォルト（プロジェクトなし）"
+        tmux has-session -t multiagent 2>/dev/null && echo "     - multiagent"
+        tmux has-session -t president 2>/dev/null && echo "     - president"
+    fi
+}
+
+# プロジェクトコンテキストクリア
+clear_context() {
+    rm -f .current-project
+    success "プロジェクトコンテキストをクリアしました"
+    info "デフォルトセッション（プロジェクトなし）を使用します"
+}
+
+# メイン処理
+main() {
+    case "$1" in
+        --list)
+            list_projects
+            ;;
+        --current)
+            show_current
+            ;;
+        --clear)
+            clear_context
+            ;;
+        "")
+            show_usage
+            exit 1
+            ;;
+        *)
+            # プロジェクト切り替え
+            PROJECT_NAME="$1"
+            
+            # セッション存在確認
+            if ! tmux has-session -t "${PROJECT_NAME}-multiagent" 2>/dev/null && \
+               ! tmux has-session -t "${PROJECT_NAME}-president" 2>/dev/null; then
+                error "プロジェクト '$PROJECT_NAME' のセッションが見つかりません"
+                info "先に './bin/setup $PROJECT_NAME' でセッションを作成してください"
+                exit 1
+            fi
+            
+            # プロジェクトコンテキスト更新
+            echo "$PROJECT_NAME" > .current-project
+            success "プロジェクト '$PROJECT_NAME' に切り替えました"
+            
+            # 現在のセッション情報表示
+            info "利用可能なセッション:"
+            tmux has-session -t "${PROJECT_NAME}-multiagent" 2>/dev/null && \
+                echo "  - ${PROJECT_NAME}-multiagent"
+            tmux has-session -t "${PROJECT_NAME}-president" 2>/dev/null && \
+                echo "  - ${PROJECT_NAME}-president"
+            ;;
+    esac
+}
+
+main "$@"

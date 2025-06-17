@@ -1,0 +1,364 @@
+#!/bin/bash
+
+# 📁 プロジェクト管理統合コマンド
+# Usage: ./bin/project <command> [arguments]
+
+set -e
+
+# 色付きメッセージ関数
+info() { echo -e "\e[34m[INFO]\e[0m $1"; }
+success() { echo -e "\e[32m[SUCCESS]\e[0m $1"; }
+warning() { echo -e "\e[33m[WARNING]\e[0m $1"; }
+error() { echo -e "\e[31m[ERROR]\e[0m $1"; }
+
+# プロジェクトコンテキストの取得
+get_current_project() {
+    if [ -f ".current-project" ]; then
+        cat .current-project
+    else
+        echo ""
+    fi
+}
+
+get_project_prefix() {
+    if [ -f ".current-project" ]; then
+        local project=$(cat .current-project)
+        echo "${project}-"
+    else
+        echo ""
+    fi
+}
+
+# ヘルプメッセージ
+show_help() {
+    cat << EOF
+📁 プロジェクト管理統合コマンド
+
+使用方法:
+  $0 <command> [arguments]
+
+コマンド一覧:
+
+  === プロジェクト管理 ===
+  list                      実行中のプロジェクト一覧を表示
+  current                   現在のプロジェクトを表示
+  switch <project-name>     プロジェクトを切り替え
+  switch --clear            プロジェクトコンテキストをクリア
+
+  === セッション操作 ===
+  attach <agent-name>       エージェントのセッションにアタッチ
+    agent-name: president, boss1, worker1-3, multiagent
+  stop [project-name]       プロジェクトのセッションを停止
+  stop --current            現在のプロジェクトを停止
+  stop --all                全プロジェクトを停止
+
+  === その他 ===
+  help                      このヘルプを表示
+
+使用例:
+  $0 list                   # 実行中のプロジェクト一覧
+  $0 switch myproject       # myprojectに切り替え
+  $0 attach boss1           # 現在のプロジェクトのboss1にアタッチ
+  $0 stop myproject         # myprojectを停止
+
+エイリアス設定（推奨）:
+  alias pj='./bin/project'  # ~/.bashrc or ~/.zshrc に追加
+EOF
+}
+
+# listコマンド: 実行中のプロジェクト一覧
+cmd_list() {
+    info "実行中のプロジェクトセッション:"
+    echo "=================================="
+    
+    local found=false
+    local current_project=$(get_current_project)
+    
+    # プロジェクト付きセッションを検索
+    tmux list-sessions 2>/dev/null | grep -E '.*-(multiagent|president)' | \
+    sed -E 's/^(.*)-(multiagent|president):.*/\1/' | sort -u | \
+    while read project; do
+        found=true
+        if [ "$project" = "$current_project" ]; then
+            echo "📁 $project ← 現在のプロジェクト"
+        else
+            echo "📁 $project"
+        fi
+        tmux has-session -t "${project}-multiagent" 2>/dev/null && echo "  - ${project}-multiagent"
+        tmux has-session -t "${project}-president" 2>/dev/null && echo "  - ${project}-president"
+    done
+    
+    # デフォルトセッション確認
+    if tmux has-session -t multiagent 2>/dev/null || \
+       tmux has-session -t president 2>/dev/null; then
+        found=true
+        echo ""
+        if [ -z "$current_project" ]; then
+            echo "📦 デフォルト（プロジェクトなし） ← 現在のプロジェクト"
+        else
+            echo "📦 デフォルト（プロジェクトなし）"
+        fi
+        tmux has-session -t multiagent 2>/dev/null && echo "  - multiagent"
+        tmux has-session -t president 2>/dev/null && echo "  - president"
+    fi
+    
+    if [ "$found" = false ]; then
+        info "実行中のセッションはありません"
+    fi
+}
+
+# currentコマンド: 現在のプロジェクトを表示
+cmd_current() {
+    local current=$(get_current_project)
+    if [ -n "$current" ]; then
+        info "現在のプロジェクト: $current"
+    else
+        info "現在のプロジェクト: なし（デフォルト）"
+    fi
+}
+
+# switchコマンド: プロジェクト切り替え
+cmd_switch() {
+    local project="$1"
+    
+    if [ "$project" = "--clear" ]; then
+        rm -f .current-project
+        success "プロジェクトコンテキストをクリアしました"
+        info "デフォルトセッション（プロジェクトなし）を使用します"
+        return
+    fi
+    
+    if [ -z "$project" ]; then
+        error "プロジェクト名を指定してください"
+        echo "使用方法: $0 switch <project-name>"
+        return 1
+    fi
+    
+    # セッション存在確認
+    if ! tmux has-session -t "${project}-multiagent" 2>/dev/null && \
+       ! tmux has-session -t "${project}-president" 2>/dev/null; then
+        error "プロジェクト '$project' のセッションが見つかりません"
+        info "先に './bin/setup $project' でセッションを作成してください"
+        return 1
+    fi
+    
+    # プロジェクトコンテキスト更新
+    echo "$project" > .current-project
+    success "プロジェクト '$project' に切り替えました"
+    
+    # 現在のセッション情報表示
+    info "利用可能なセッション:"
+    tmux has-session -t "${project}-multiagent" 2>/dev/null && \
+        echo "  - ${project}-multiagent"
+    tmux has-session -t "${project}-president" 2>/dev/null && \
+        echo "  - ${project}-president"
+}
+
+# attachコマンド: セッションアタッチ
+cmd_attach() {
+    local agent="$1"
+    local prefix=$(get_project_prefix)
+    local target=""
+    
+    if [ -z "$agent" ]; then
+        local current=$(get_current_project)
+        if [ -n "$current" ]; then
+            info "プロジェクト '$current' の利用可能なエージェント:"
+        else
+            info "デフォルトプロジェクトの利用可能なエージェント:"
+        fi
+        echo "  president   - プロジェクト統括責任者"
+        echo "  boss1       - チームリーダー"
+        echo "  worker1     - 実行担当者A"
+        echo "  worker2     - 実行担当者B"
+        echo "  worker3     - 実行担当者C"
+        echo "  multiagent  - マルチエージェント全体（4分割画面）"
+        return
+    fi
+    
+    # エージェント名からセッション情報を取得
+    case "$agent" in
+        "president")
+            target="${prefix}president"
+            ;;
+        "boss1")
+            target="${prefix}multiagent:0.0"
+            ;;
+        "worker1")
+            target="${prefix}multiagent:0.1"
+            ;;
+        "worker2")
+            target="${prefix}multiagent:0.2"
+            ;;
+        "worker3")
+            target="${prefix}multiagent:0.3"
+            ;;
+        "multiagent")
+            target="${prefix}multiagent"
+            ;;
+        *)
+            error "不明なエージェント: '$agent'"
+            return 1
+            ;;
+    esac
+    
+    local session_name="${target%%:*}"
+    
+    # セッション存在確認
+    if ! tmux has-session -t "$session_name" 2>/dev/null; then
+        error "セッション '$session_name' が見つかりません"
+        info "先に './bin/setup' でセッションを作成してください"
+        return 1
+    fi
+    
+    # 既にtmux内にいる場合は切り替え、そうでなければアタッチ
+    if [ -n "$TMUX" ]; then
+        info "tmux内から切り替え: $target"
+        tmux switch-client -t "$target"
+    else
+        info "セッションにアタッチ: $target"
+        tmux attach-session -t "$target"
+    fi
+}
+
+# stopコマンド: セッション停止
+cmd_stop() {
+    local arg="$1"
+    
+    # 停止確認関数
+    confirm_stop() {
+        local message="$1"
+        warning "$message"
+        read -p "本当に停止しますか？ (y/N): " -n 1 -r
+        echo ""
+        [[ $REPLY =~ ^[Yy]$ ]]
+    }
+    
+    # プロジェクトセッション停止関数
+    stop_project_sessions() {
+        local project="$1"
+        local prefix=""
+        
+        if [ -n "$project" ]; then
+            prefix="${project}-"
+        fi
+        
+        local stopped=false
+        
+        # multiagentセッション停止
+        if tmux has-session -t "${prefix}multiagent" 2>/dev/null; then
+            info "${prefix}multiagentセッションを停止中..."
+            tmux kill-session -t "${prefix}multiagent"
+            success "${prefix}multiagentセッションを停止しました"
+            stopped=true
+        fi
+        
+        # presidentセッション停止
+        if tmux has-session -t "${prefix}president" 2>/dev/null; then
+            info "${prefix}presidentセッションを停止中..."
+            tmux kill-session -t "${prefix}president"
+            success "${prefix}presidentセッションを停止しました"
+            stopped=true
+        fi
+        
+        if [ "$stopped" = false ]; then
+            if [ -n "$project" ]; then
+                info "プロジェクト '$project' のセッションは実行されていません"
+            else
+                info "デフォルトセッションは実行されていません"
+            fi
+        fi
+    }
+    
+    case "$arg" in
+        --current)
+            local current=$(get_current_project)
+            if [ -z "$current" ]; then
+                if confirm_stop "デフォルトセッションを停止しますか？"; then
+                    stop_project_sessions ""
+                fi
+            else
+                if confirm_stop "プロジェクト '$current' のセッションを停止しますか？"; then
+                    stop_project_sessions "$current"
+                fi
+            fi
+            ;;
+        --all)
+            if confirm_stop "全てのプロジェクトセッションを停止しますか？"; then
+                info "全プロジェクトセッションを検索中..."
+                
+                # プロジェクトセッションを収集して停止
+                local sessions=()
+                while IFS= read -r session; do
+                    if [[ "$session" =~ -(multiagent|president) ]] || \
+                       [[ "$session" == "multiagent" ]] || \
+                       [[ "$session" == "president" ]]; then
+                        sessions+=("$session")
+                    fi
+                done < <(tmux list-sessions -F "#{session_name}" 2>/dev/null || true)
+                
+                if [ ${#sessions[@]} -eq 0 ]; then
+                    info "停止するセッションがありません"
+                    return
+                fi
+                
+                # 停止処理
+                for session in "${sessions[@]}"; do
+                    info "セッション '$session' を停止中..."
+                    tmux kill-session -t "$session"
+                    success "セッション '$session' を停止しました"
+                done
+                
+                success "全てのプロジェクトセッションを停止しました"
+            fi
+            ;;
+        "")
+            error "停止対象を指定してください"
+            echo "使用方法:"
+            echo "  $0 stop <project-name>  # 特定プロジェクトを停止"
+            echo "  $0 stop --current       # 現在のプロジェクトを停止"
+            echo "  $0 stop --all           # 全プロジェクトを停止"
+            ;;
+        *)
+            # プロジェクト名指定
+            if confirm_stop "プロジェクト '$arg' のセッションを停止しますか？"; then
+                stop_project_sessions "$arg"
+            fi
+            ;;
+    esac
+}
+
+# メイン処理
+main() {
+    local command="$1"
+    shift || true
+    
+    case "$command" in
+        list)
+            cmd_list
+            ;;
+        current)
+            cmd_current
+            ;;
+        switch)
+            cmd_switch "$@"
+            ;;
+        attach)
+            cmd_attach "$@"
+            ;;
+        stop)
+            cmd_stop "$@"
+            ;;
+        help|--help|-h|"")
+            show_help
+            ;;
+        *)
+            error "不明なコマンド: '$command'"
+            echo ""
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
