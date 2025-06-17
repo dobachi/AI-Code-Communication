@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 🚀 Agent間メッセージ送信スクリプト
+# 🚀 Agent間メッセージ送信スクリプト（統合版）
 
 # プロジェクトコンテキストの取得
 get_project_prefix() {
@@ -25,12 +25,24 @@ get_agent_target() {
     esac
 }
 
+# エージェントグループを展開
+expand_agent_group() {
+    case "$1" in
+        "all") echo "president boss1 worker1 worker2 worker3" ;;
+        "team") echo "boss1 worker1 worker2 worker3" ;;
+        "workers") echo "worker1 worker2 worker3" ;;
+        *) echo "$1" ;;
+    esac
+}
+
 show_usage() {
     cat << EOF
-🤖 Agent間メッセージ送信
+🤖 Agent間メッセージ送信（統合版）
 
 使用方法:
-  $0 [エージェント名] [メッセージ]
+  $0 [エージェント名] [メッセージ]                    # 単一送信
+  $0 [エージェント1] [エージェント2] ... -- [メッセージ]  # 複数送信
+  $0 [グループ名] [メッセージ]                        # グループ送信
   $0 --list
 
 利用可能エージェント:
@@ -40,10 +52,16 @@ show_usage() {
   worker2   - 実行担当者B
   worker3   - 実行担当者C
 
+利用可能グループ:
+  all      - 全員（president, boss1, worker1-3）
+  team     - チーム全体（boss1, worker1-3）
+  workers  - ワーカー全員（worker1-3）
+
 使用例:
-  $0 president "指示書に従って"
-  $0 boss1 "Hello World プロジェクト開始指示"
-  $0 worker1 "作業完了しました"
+  $0 worker1 "作業開始します"                         # 単一送信
+  $0 worker1 worker2 -- "協力して作業してください"     # 複数送信
+  $0 team "進捗を報告してください"                    # チーム全体へ
+  $0 all "緊急連絡です"                              # 全員へ
 EOF
 }
 
@@ -63,6 +81,12 @@ show_agents() {
     echo "  worker1   → ${prefix}multiagent:0.1  (実行担当者A)"
     echo "  worker2   → ${prefix}multiagent:0.2  (実行担当者B)" 
     echo "  worker3   → ${prefix}multiagent:0.3  (実行担当者C)"
+    echo ""
+    echo "📋 利用可能なグループ:"
+    echo "=========================="
+    echo "  all      - 全員"
+    echo "  team     - チーム（boss1 + workers）"
+    echo "  workers  - ワーカー全員"
 }
 
 # ログ記録
@@ -124,6 +148,64 @@ check_target() {
     return 0
 }
 
+# 単一エージェントへの送信
+send_to_single_agent() {
+    local agent_name="$1"
+    local message="$2"
+    
+    # エージェントターゲット取得
+    local target
+    target=$(get_agent_target "$agent_name")
+    
+    if [[ -z "$target" ]]; then
+        echo "❌ エラー: 不明なエージェント '$agent_name'"
+        echo "利用可能エージェント: $0 --list"
+        return 1
+    fi
+    
+    # ターゲット確認
+    if ! check_target "$target"; then
+        return 1
+    fi
+    
+    # メッセージ送信
+    send_message "$target" "$message"
+    
+    # ログ記録
+    log_send "$agent_name" "$message"
+    
+    echo "✅ 送信完了: $agent_name に '$message'"
+    
+    return 0
+}
+
+# 複数エージェントへの送信
+send_to_multiple_agents() {
+    local agents=("$@")
+    local message="${agents[-1]}"
+    unset 'agents[-1]'
+    
+    echo "📢 ブロードキャスト送信開始"
+    echo "対象: ${agents[*]}"
+    echo "メッセージ: $message"
+    echo "=========================="
+    
+    local success_count=0
+    local fail_count=0
+    
+    for agent in "${agents[@]}"; do
+        if send_to_single_agent "$agent" "$message"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+        sleep 0.5  # 送信間隔
+    done
+    
+    echo "=========================="
+    echo "✅ ブロードキャスト完了 (成功: $success_count, 失敗: $fail_count)"
+}
+
 # メイン処理
 main() {
     if [[ $# -eq 0 ]]; then
@@ -142,33 +224,69 @@ main() {
         exit 1
     fi
     
-    local agent_name="$1"
-    local message="$2"
+    # 引数を解析
+    local agents=()
+    local message=""
+    local found_separator=false
     
-    # エージェントターゲット取得
-    local target
-    target=$(get_agent_target "$agent_name")
+    # 引数をパース
+    for arg in "$@"; do
+        if [[ "$arg" == "--" ]]; then
+            found_separator=true
+            continue
+        fi
+        
+        if [[ "$found_separator" == false ]]; then
+            # セパレータ前はエージェント名
+            agents+=("$arg")
+        else
+            # セパレータ後はメッセージ
+            if [[ -z "$message" ]]; then
+                message="$arg"
+            else
+                message="$message $arg"
+            fi
+        fi
+    done
     
-    if [[ -z "$target" ]]; then
-        echo "❌ エラー: 不明なエージェント '$agent_name'"
-        echo "利用可能エージェント: $0 --list"
-        exit 1
+    # セパレータがない場合の処理
+    if [[ "$found_separator" == false ]]; then
+        if [[ ${#agents[@]} -eq 2 ]]; then
+            # 2引数の場合: 単一送信またはグループ送信
+            local expanded=$(expand_agent_group "${agents[0]}")
+            if [[ "$expanded" != "${agents[0]}" ]]; then
+                # グループ送信
+                IFS=' ' read -ra expanded_agents <<< "$expanded"
+                send_to_multiple_agents "${expanded_agents[@]}" "${agents[1]}"
+            else
+                # 単一送信
+                send_to_single_agent "${agents[0]}" "${agents[1]}"
+            fi
+        else
+            echo "❌ エラー: 複数エージェントへの送信には '--' セパレータが必要です"
+            echo "例: $0 worker1 worker2 -- メッセージ"
+            exit 1
+        fi
+    else
+        # セパレータがある場合: 複数送信
+        if [[ -z "$message" ]]; then
+            echo "❌ エラー: メッセージが空です"
+            exit 1
+        fi
+        
+        # グループ名を展開
+        local expanded_agents=()
+        for agent in "${agents[@]}"; do
+            local expanded=$(expand_agent_group "$agent")
+            IFS=' ' read -ra temp_agents <<< "$expanded"
+            expanded_agents+=("${temp_agents[@]}")
+        done
+        
+        # 重複を削除
+        local unique_agents=($(echo "${expanded_agents[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
+        
+        send_to_multiple_agents "${unique_agents[@]}" "$message"
     fi
-    
-    # ターゲット確認
-    if ! check_target "$target"; then
-        exit 1
-    fi
-    
-    # メッセージ送信
-    send_message "$target" "$message"
-    
-    # ログ記録
-    log_send "$agent_name" "$message"
-    
-    echo "✅ 送信完了: $agent_name に '$message'"
-    
-    return 0
 }
 
-main "$@" 
+main "$@"
