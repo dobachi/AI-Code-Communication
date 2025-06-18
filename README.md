@@ -330,10 +330,12 @@ rm -rf ./tmp/*
 ./bin/project setup             # デフォルトセッション作成
 ./bin/project create <project>  # プロジェクト作成
 ./bin/project list              # 実行中のプロジェクト一覧
+./bin/project list --all        # 全プロジェクト一覧（停止中も含む）
 ./bin/project current           # 現在のプロジェクトを表示
 ./bin/project switch <project>  # プロジェクトを切り替え
 ./bin/project attach <agent>    # エージェントにアタッチ
 ./bin/project stop <project>    # プロジェクトを停止
+./bin/project delete <project>  # プロジェクトを完全削除（要確認）
 ```
 
 **プロジェクト管理：**
@@ -356,12 +358,17 @@ rm -rf ./tmp/*
 ./bin/project attach            # 利用可能なエージェント一覧
 ```
 
-**セッション停止：**
+**セッション停止・削除：**
 ```bash
 # セッションの停止
 ./bin/project stop --current    # 現在のプロジェクトを停止
 ./bin/project stop project1     # 特定のプロジェクトを停止
 ./bin/project stop --all        # 全プロジェクトを停止
+
+# プロジェクトの削除（危険：データも削除）
+./bin/project delete project1   # 特定のプロジェクトを完全削除
+./bin/project delete --current  # 現在のプロジェクトを削除
+# ⚠️ 削除時は二重確認（yes入力＋プロジェクト名入力）が必要
 ```
 
 **活用例：**

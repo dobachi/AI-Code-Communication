@@ -56,6 +56,8 @@ show_help() {
   stop [project-name]       プロジェクトのセッションを停止
   stop --current            現在のプロジェクトを停止
   stop --all                全プロジェクトを停止
+  delete <project-name>     プロジェクトを完全に削除（データも削除）
+  delete --current          現在のプロジェクトを削除
 
   === その他 ===
   help                      このヘルプを表示
@@ -67,6 +69,7 @@ show_help() {
   $0 switch myproject       # myprojectに切り替え
   $0 attach boss1           # 現在のプロジェクトのboss1にアタッチ
   $0 stop myproject         # myprojectを停止
+  $0 delete myproject       # myprojectを完全削除
 
 エイリアス設定（推奨）:
   alias pj='./bin/project'  # ~/.bashrc or ~/.zshrc に追加
@@ -666,6 +669,135 @@ cmd_setup() {
     echo "  ./bin/project attach multiagent     # 4分割画面で全エージェントを表示"
 }
 
+# deleteコマンド: プロジェクト削除
+cmd_delete() {
+    local arg="$1"
+    local project=""
+    
+    # 削除確認関数（強化版）
+    confirm_delete() {
+        local project_name="$1"
+        local project_dir="projects/$project_name"
+        
+        warning "⚠️  警告: この操作は取り消せません！"
+        echo ""
+        echo "削除されるもの:"
+        echo "  📁 プロジェクトディレクトリ: $project_dir"
+        
+        # ディレクトリサイズ表示
+        if [[ -d "$project_dir" ]]; then
+            local size=$(du -sh "$project_dir" 2>/dev/null | cut -f1)
+            echo "  💾 ディスクサイズ: $size"
+            
+            # ファイル数カウント
+            local file_count=$(find "$project_dir" -type f 2>/dev/null | wc -l)
+            echo "  📄 ファイル数: $file_count"
+        fi
+        
+        # 実行中のセッション確認
+        local running_sessions=()
+        if tmux has-session -t "${project_name}-multiagent" 2>/dev/null; then
+            running_sessions+=("${project_name}-multiagent")
+        fi
+        if tmux has-session -t "${project_name}-president" 2>/dev/null; then
+            running_sessions+=("${project_name}-president")
+        fi
+        
+        if [[ ${#running_sessions[@]} -gt 0 ]]; then
+            echo ""
+            echo "  🟢 実行中のセッション:"
+            for session in "${running_sessions[@]}"; do
+                echo "     - $session"
+            done
+        fi
+        
+        echo ""
+        echo "この操作により:"
+        echo "  • すべてのソースコードが削除されます"
+        echo "  • すべてのドキュメントが削除されます"
+        echo "  • すべてのGit履歴が削除されます"
+        echo "  • 実行中のセッションが停止されます"
+        
+        echo ""
+        read -p "本当にプロジェクト '$project_name' を削除しますか？ (yes/N): " -r
+        if [[ ! "$REPLY" == "yes" ]]; then
+            info "削除をキャンセルしました"
+            return 1
+        fi
+        
+        # 二次確認
+        echo ""
+        warning "最終確認: プロジェクト名を入力してください"
+        read -p "削除するプロジェクト名: " -r confirm_name
+        
+        if [[ "$confirm_name" != "$project_name" ]]; then
+            error "プロジェクト名が一致しません"
+            info "削除をキャンセルしました"
+            return 1
+        fi
+        
+        return 0
+    }
+    
+    # 引数処理
+    case "$arg" in
+        --current)
+            project=$(get_current_project)
+            if [[ -z "$project" ]]; then
+                error "現在のプロジェクトが設定されていません"
+                return 1
+            fi
+            ;;
+        "")
+            error "削除するプロジェクトを指定してください"
+            echo "使用方法:"
+            echo "  $0 delete <project-name>  # 特定プロジェクトを削除"
+            echo "  $0 delete --current       # 現在のプロジェクトを削除"
+            return 1
+            ;;
+        *)
+            project="$arg"
+            ;;
+    esac
+    
+    # プロジェクト存在確認
+    if [[ ! -d "projects/$project" ]]; then
+        error "プロジェクト '$project' が見つかりません"
+        return 1
+    fi
+    
+    # 削除確認
+    if ! confirm_delete "$project"; then
+        return 0
+    fi
+    
+    info "プロジェクト '$project' を削除中..."
+    
+    # セッション停止
+    if tmux has-session -t "${project}-multiagent" 2>/dev/null || \
+       tmux has-session -t "${project}-president" 2>/dev/null; then
+        info "実行中のセッションを停止中..."
+        tmux kill-session -t "${project}-multiagent" 2>/dev/null || true
+        tmux kill-session -t "${project}-president" 2>/dev/null || true
+    fi
+    
+    # プロジェクトディレクトリ削除
+    info "プロジェクトディレクトリを削除中..."
+    if ! rm -rf "projects/$project"; then
+        error "プロジェクトディレクトリの削除に失敗しました"
+        return 1
+    fi
+    
+    # 現在のプロジェクトをクリア（削除したプロジェクトが現在のプロジェクトの場合）
+    local current=$(get_current_project)
+    if [[ "$current" == "$project" ]]; then
+        rm -f .current-project
+        info "現在のプロジェクト設定をクリアしました"
+    fi
+    
+    success "プロジェクト '$project' を完全に削除しました"
+}
+
 # stopコマンド: セッション停止
 cmd_stop() {
     local arg="$1"
@@ -799,6 +931,9 @@ main() {
             ;;
         stop)
             cmd_stop "$@"
+            ;;
+        delete)
+            cmd_delete "$@"
             ;;
         help|--help|-h|"")
             show_help
