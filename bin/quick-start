@@ -1,0 +1,158 @@
+#!/bin/bash
+
+# 🚀 Quick Start Script - プロジェクト作成からAI起動まで一括実行
+# Usage: ./bin/quick-start <project-name> [options]
+
+set -e
+
+# 色付きメッセージ関数
+info() { echo -e "\e[34m[INFO]\e[0m $1"; }
+success() { echo -e "\e[32m[SUCCESS]\e[0m $1"; }
+error() { echo -e "\e[31m[ERROR]\e[0m $1"; }
+
+# ヘルプメッセージ
+show_help() {
+    cat << EOF
+🚀 Quick Start - プロジェクト作成からAI起動まで一括実行
+
+使用方法:
+  $0 <project-name> [options]
+  $0 --default                    # デフォルトセッション作成+AI起動
+
+引数:
+  project-name                     新規プロジェクト名
+
+オプション:
+  --git                           Git リポジトリを初期化
+  --remote URL                    リモートリポジトリURLを設定
+  --default                       デフォルトセッション（プロジェクトなし）を使用
+  --no-start                      AI起動をスキップ（セッション作成のみ）
+  -h, --help                      このヘルプを表示
+
+使用例:
+  $0 myproject                    # プロジェクト作成→AI起動
+  $0 myproject --git              # Git付きプロジェクト作成→AI起動
+  $0 --default                    # デフォルトセッション→AI起動
+  $0 myproject --no-start         # プロジェクト作成のみ
+
+このスクリプトは以下を自動実行します:
+  1. プロジェクト作成（またはデフォルトセッション作成）
+  2. Claude Codeエージェント起動
+  3. アタッチ方法の案内表示
+EOF
+}
+
+# 変数初期化
+PROJECT_NAME=""
+USE_DEFAULT=false
+NO_START=false
+GIT_ARGS=()
+
+# 引数解析
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --default)
+            USE_DEFAULT=true
+            shift
+            ;;
+        --no-start)
+            NO_START=true
+            shift
+            ;;
+        --git)
+            GIT_ARGS+=("--git")
+            shift
+            ;;
+        --remote)
+            if [[ -z "$2" ]]; then
+                error "--remoteオプションにはURLが必要です"
+                exit 1
+            fi
+            GIT_ARGS+=("--remote" "$2")
+            shift 2
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -*)
+            error "不明なオプション: $1"
+            echo "使用方法は $0 --help を参照してください"
+            exit 1
+            ;;
+        *)
+            if [[ -z "$PROJECT_NAME" ]]; then
+                PROJECT_NAME="$1"
+            else
+                error "プロジェクト名が複数指定されています"
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+# 検証
+if [[ "$USE_DEFAULT" == true ]] && [[ -n "$PROJECT_NAME" ]]; then
+    error "--default とプロジェクト名は同時に指定できません"
+    exit 1
+fi
+
+if [[ "$USE_DEFAULT" == false ]] && [[ -z "$PROJECT_NAME" ]]; then
+    error "プロジェクト名を指定するか、--default オプションを使用してください"
+    echo "使用方法は $0 --help を参照してください"
+    exit 1
+fi
+
+# メイン処理
+info "🚀 Quick Start 開始..."
+echo ""
+
+# Step 1: プロジェクト/セッション作成
+if [[ "$USE_DEFAULT" == true ]]; then
+    info "デフォルトセッションを作成中..."
+    if ! ./bin/project setup; then
+        error "セッション作成に失敗しました"
+        exit 1
+    fi
+else
+    info "プロジェクト '$PROJECT_NAME' を作成中..."
+    if ! ./bin/project create "$PROJECT_NAME" "${GIT_ARGS[@]}"; then
+        error "プロジェクト作成に失敗しました"
+        exit 1
+    fi
+fi
+
+echo ""
+
+# Step 2: AI起動（オプション）
+if [[ "$NO_START" == false ]]; then
+    info "Claude Codeエージェントを起動中..."
+    if ! ./bin/claude-startup; then
+        error "AI起動に失敗しました"
+        exit 1
+    fi
+    
+    echo ""
+    success "✨ すべての準備が完了しました！"
+    echo ""
+    info "次のステップ:"
+    echo "  ./bin/project attach president      # プレジデントと対話"
+    echo "  ./bin/project attach multiagent     # 全エージェントを確認"
+    echo ""
+    if [[ "$USE_DEFAULT" == false ]]; then
+        info "プロジェクトディレクトリ: projects/$PROJECT_NAME"
+    fi
+else
+    echo ""
+    success "✅ セッション作成が完了しました"
+    info "AIを起動するには: ./bin/claude-startup"
+fi
+
+# プロジェクト切り替えの案内
+if [[ "$USE_DEFAULT" == false ]]; then
+    echo ""
+    info "💡 ヒント: 複数プロジェクトを管理する場合"
+    echo "  ./bin/project list              # プロジェクト一覧"
+    echo "  ./bin/project switch <name>     # プロジェクト切り替え"
+fi

@@ -34,12 +34,19 @@ cd Claude-Code-Communication
 ```
 
 #### 2️⃣ 環境構築（30秒）
+
+**最速で始める（推奨）：**
+```bash
+./bin/quick-start myproject      # プロジェクト作成→AI起動まで全自動！
+```
+
+**個別に実行する場合：**
 ```bash
 # デフォルトプロジェクト（プロジェクト名なし）の場合
 ./bin/project setup
 
 # 新規プロジェクトを作成する場合
-./bin/project create myproject    # プロジェクト作成＆環境構築を一度に実行
+./bin/project create myproject    # プロジェクト作成＆環境構築
 ```
 これで4つのターミナル画面が自動で作られます！
 
@@ -148,6 +155,7 @@ UIデザインの革新的アイデアを3つ以上提案してください。
 
 ### コマンドツール（bin/）
 ユーザー向けの実行コマンドです
+- **quick-start**: プロジェクト作成からAI起動まで一括実行（最速セットアップ）
 - **project**: 統合プロジェクト管理（作成・セットアップ・切替・停止など）
 - **agent-send**: エージェント間メッセージ送信
 - **claude-startup**: Claude Codeエージェントの一括起動
@@ -261,7 +269,19 @@ rm -rf ./tmp/*
 
 ## 🚀 自分のプロジェクトを作る
 
-### プロジェクトの作成
+### 最速で始める（推奨）
+```bash
+# プロジェクト作成→AI起動まで全自動
+./bin/quick-start my-new-project
+
+# Git管理付きで作成
+./bin/quick-start my-project --git --remote git@github.com:user
+
+# デフォルトセッションで始める
+./bin/quick-start --default
+```
+
+### 手動でプロジェクトを作成
 ```bash
 # 新しいプロジェクトを作成
 ./bin/project create my-new-project
@@ -346,13 +366,12 @@ rm -rf ./tmp/*
 
 **活用例：**
 ```bash
-# プロジェクト1で作業開始
-./bin/project create project1   # プロジェクト作成（ディレクトリ＋セッション）
-./bin/claude-startup            # AIエージェント起動
+# プロジェクト1で作業開始（最速）
+./bin/quick-start project1      # 作成→AI起動まで全自動
 ./bin/project attach boss1      # boss1の作業を確認
 
-# プロジェクト2に切り替え
-./bin/project create project2   # 新規プロジェクト作成
+# プロジェクト2を追加
+./bin/quick-start project2 --git # Git付きで作成
 ./bin/project attach president  # project2のpresidentにアタッチ
 
 # 状態確認と終了
@@ -363,9 +382,11 @@ rm -rf ./tmp/*
 **エイリアス設定（推奨）：**
 ```bash
 # ~/.bashrc または ~/.zshrc に追加
+alias qs='./bin/quick-start'
 alias pj='./bin/project'
 
 # 使用例
+qs myproject                    # 最速でプロジェクト開始
 pj list                         # プロジェクト一覧
 pj switch myproject             # プロジェクト切り替え
 pj attach boss1                 # エージェントにアタッチ

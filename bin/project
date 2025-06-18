@@ -44,7 +44,8 @@ show_help() {
     [options] --git         Git リポジトリを初期化
               --remote URL  リモートリポジトリURLを設定
   setup                     デフォルトセッション作成（プロジェクトなし）
-  list                      実行中のプロジェクト一覧を表示
+  list [--all]              実行中のプロジェクト一覧を表示
+                            --all: 全プロジェクト（実行中でないものも含む）
   current                   現在のプロジェクトを表示
   switch <project-name>     プロジェクトを切り替え
   switch --clear            プロジェクトコンテキストをクリア
@@ -72,33 +73,95 @@ show_help() {
 EOF
 }
 
-# listコマンド: 実行中のプロジェクト一覧
+# listコマンド: プロジェクト一覧
 cmd_list() {
-    info "実行中のプロジェクトセッション:"
+    local show_all=false
+    
+    # --allオプションの確認
+    if [[ "$1" == "--all" ]]; then
+        show_all=true
+    fi
+    if [[ "$show_all" == true ]]; then
+        info "全プロジェクト一覧:"
+    else
+        info "実行中のプロジェクトセッション:"
+    fi
     echo "=================================="
     
     local found=false
     local current_project=$(get_current_project)
+    local running_projects=()
     
-    # プロジェクト付きセッションを検索
-    tmux list-sessions 2>/dev/null | grep -E '.*-(multiagent|president)' | \
-    sed -E 's/^(.*)-(multiagent|president):.*/\1/' | sort -u | \
-    while read project; do
-        found=true
-        if [ "$project" = "$current_project" ]; then
-            echo "📁 $project ← 現在のプロジェクト"
-        else
-            echo "📁 $project"
+    # 実行中のプロジェクトを収集
+    while IFS= read -r session; do
+        if [[ "$session" =~ ^(.+)-(multiagent|president)$ ]]; then
+            local proj="${BASH_REMATCH[1]}"
+            # 重複を避ける
+            if [[ ! " ${running_projects[@]} " =~ " ${proj} " ]]; then
+                running_projects+=("$proj")
+            fi
         fi
-        tmux has-session -t "${project}-multiagent" 2>/dev/null && echo "  - ${project}-multiagent"
-        tmux has-session -t "${project}-president" 2>/dev/null && echo "  - ${project}-president"
-    done
+    done < <(tmux list-sessions -F "#{session_name}" 2>/dev/null || true)
+    
+    # --allの場合、projects/ディレクトリも確認
+    if [[ "$show_all" == true ]] && [[ -d "projects" ]]; then
+        echo "📂 全プロジェクト:"
+        echo ""
+        
+        # projects/ディレクトリ内のプロジェクトをリスト
+        for proj_dir in projects/*/; do
+            if [[ -d "$proj_dir" ]]; then
+                local proj_name=$(basename "$proj_dir")
+                found=true
+                
+                # ステータス判定
+                local status="停止中"
+                local icon="⚪"
+                if [[ " ${running_projects[@]} " =~ " ${proj_name} " ]]; then
+                    status="実行中"
+                    icon="🟢"
+                fi
+                
+                # 現在のプロジェクトかチェック
+                if [[ "$proj_name" == "$current_project" ]]; then
+                    echo "$icon $proj_name ($status) ← 現在のプロジェクト"
+                else
+                    echo "$icon $proj_name ($status)"
+                fi
+                
+                # 実行中の場合はセッション情報表示
+                if [[ "$status" == "実行中" ]]; then
+                    tmux has-session -t "${proj_name}-multiagent" 2>/dev/null && echo "    - ${proj_name}-multiagent"
+                    tmux has-session -t "${proj_name}-president" 2>/dev/null && echo "    - ${proj_name}-president"
+                fi
+            fi
+        done
+        
+        echo ""
+    fi
+    
+    # 実行中のプロジェクトのみ表示（デフォルト）
+    if [[ "$show_all" == false ]]; then
+        # プロジェクト付きセッション
+        for project in "${running_projects[@]}"; do
+            found=true
+            if [ "$project" = "$current_project" ]; then
+                echo "📁 $project ← 現在のプロジェクト"
+            else
+                echo "📁 $project"
+            fi
+            tmux has-session -t "${project}-multiagent" 2>/dev/null && echo "  - ${project}-multiagent"
+            tmux has-session -t "${project}-president" 2>/dev/null && echo "  - ${project}-president"
+        done
+    fi
     
     # デフォルトセッション確認
     if tmux has-session -t multiagent 2>/dev/null || \
        tmux has-session -t president 2>/dev/null; then
         found=true
-        echo ""
+        if [[ "$show_all" == false ]] || [[ ${#running_projects[@]} -gt 0 ]]; then
+            echo ""
+        fi
         if [ -z "$current_project" ]; then
             echo "📦 デフォルト（プロジェクトなし） ← 現在のプロジェクト"
         else
@@ -109,7 +172,17 @@ cmd_list() {
     fi
     
     if [ "$found" = false ]; then
-        info "実行中のセッションはありません"
+        if [[ "$show_all" == true ]]; then
+            info "プロジェクトが存在しません"
+        else
+            info "実行中のセッションはありません"
+        fi
+    fi
+    
+    # ヒント表示
+    if [[ "$show_all" == false ]] && [[ -d "projects" ]]; then
+        echo ""
+        info "ヒント: すべてのプロジェクトを表示するには '--all' オプションを使用"
     fi
 }
 
@@ -713,7 +786,7 @@ main() {
             cmd_setup
             ;;
         list)
-            cmd_list
+            cmd_list "$@"
             ;;
         current)
             cmd_current
