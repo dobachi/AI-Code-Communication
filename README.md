@@ -35,19 +35,23 @@ cd Claude-Code-Communication
 
 #### 2️⃣ 環境構築（30秒）
 ```bash
-./bin/setup
+# デフォルトプロジェクト（プロジェクト名なし）の場合
+./bin/project setup
+
+# 新規プロジェクトを作成する場合
+./bin/project create myproject    # プロジェクト作成＆環境構築を一度に実行
 ```
 これで4つのターミナル画面が自動で作られます！
 
 **複数プロジェクトを並行実行する場合：**
 ```bash
-# プロジェクト名を指定してセッション作成
-./bin/setup project1
-./bin/setup project2
+# プロジェクト作成（ディレクトリ構造＋tmuxセッション）
+./bin/project create project1
+./bin/project create project2 --git    # Git管理付き
 
 # プロジェクト切り替え
-./bin/project-switch project1
-./bin/project-switch --list    # 実行中のプロジェクト一覧
+./bin/project switch project1
+./bin/project list    # 実行中のプロジェクト一覧
 ```
 
 #### 3️⃣ AIを自動起動（1分）
@@ -144,9 +148,9 @@ UIデザインの革新的アイデアを3つ以上提案してください。
 
 ### コマンドツール（bin/）
 ユーザー向けの実行コマンドです
+- **project**: 統合プロジェクト管理（作成・セットアップ・切替・停止など）
 - **agent-send**: エージェント間メッセージ送信
-- **setup**: 環境セットアップ
-- **project-init**: 新規プロジェクト作成
+- **claude-startup**: Claude Codeエージェントの一括起動
 
 ### 指示書（instructions/）
 各エージェントの行動マニュアルです
@@ -229,10 +233,10 @@ emotiflow-mvp/
 ### Q: エージェントが反応しない
 ```bash
 # 状態を確認
-tmux ls
+./bin/project list
 
-# 環境を再構築
-./bin/setup
+# 現在のプロジェクトを確認
+./bin/project current
 
 # AIを再起動
 ./bin/claude-startup
@@ -252,7 +256,7 @@ cat logs/send_log.txt
 # 全部リセット
 tmux kill-server
 rm -rf ./tmp/*
-./bin/setup
+./bin/project setup    # デフォルトセッション再作成
 ```
 
 ## 🚀 自分のプロジェクトを作る
@@ -260,10 +264,10 @@ rm -rf ./tmp/*
 ### プロジェクトの作成
 ```bash
 # 新しいプロジェクトを作成
-./bin/project-init my-new-project
+./bin/project create my-new-project
 
 # Git管理を含める場合
-./bin/project-init my-project --git --remote git@github.com:user
+./bin/project create my-project --git --remote git@github.com:user
 ```
 
 ### 🆕 複数プロジェクトの並行実行
@@ -272,12 +276,12 @@ rm -rf ./tmp/*
 
 ```bash
 # プロジェクト1を開始
-./bin/setup project1
-./bin/claude-startup project1
+./bin/project create project1   # プロジェクト作成＆環境構築
+./bin/claude-startup            # AIエージェント起動
 
 # プロジェクト2を開始（project1は動いたまま）
-./bin/setup project2
-./bin/claude-startup project2
+./bin/project create project2   # 別のプロジェクトを作成
+./bin/claude-startup            # project2のAIエージェント起動
 
 # 統合プロジェクト管理コマンドを使用
 ./bin/project list              # 実行中のプロジェクト一覧
@@ -303,6 +307,8 @@ rm -rf ./tmp/*
 **基本的な使い方：**
 ```bash
 ./bin/project help              # ヘルプを表示
+./bin/project setup             # デフォルトセッション作成
+./bin/project create <project>  # プロジェクト作成
 ./bin/project list              # 実行中のプロジェクト一覧
 ./bin/project current           # 現在のプロジェクトを表示
 ./bin/project switch <project>  # プロジェクトを切り替え
@@ -341,12 +347,12 @@ rm -rf ./tmp/*
 **活用例：**
 ```bash
 # プロジェクト1で作業開始
-./bin/setup project1
-./bin/claude-startup
+./bin/project create project1   # プロジェクト作成（ディレクトリ＋セッション）
+./bin/claude-startup            # AIエージェント起動
 ./bin/project attach boss1      # boss1の作業を確認
 
 # プロジェクト2に切り替え
-./bin/project switch project2
+./bin/project create project2   # 新規プロジェクト作成
 ./bin/project attach president  # project2のpresidentにアタッチ
 
 # 状態確認と終了
@@ -458,7 +464,7 @@ TODOアプリを作ってください。
 
 **新しい作業者を追加：**
 1. `instructions/worker4.md`を作成
-2. `bin/setup`を編集してペインを追加
+2. `bin/project`の`cmd_create`と`cmd_setup`関数を編集してペインを追加
 3. `bin/agent-send`にマッピングを追加
 
 **タイマーを変更：**

@@ -40,6 +40,10 @@ show_help() {
 コマンド一覧:
 
   === プロジェクト管理 ===
+  create <project-name>     新しいプロジェクトを作成
+    [options] --git         Git リポジトリを初期化
+              --remote URL  リモートリポジトリURLを設定
+  setup                     デフォルトセッション作成（プロジェクトなし）
   list                      実行中のプロジェクト一覧を表示
   current                   現在のプロジェクトを表示
   switch <project-name>     プロジェクトを切り替え
@@ -56,6 +60,8 @@ show_help() {
   help                      このヘルプを表示
 
 使用例:
+  $0 setup                  # デフォルトセッション作成
+  $0 create myproject --git # myprojectを作成（Git付き）
   $0 list                   # 実行中のプロジェクト一覧
   $0 switch myproject       # myprojectに切り替え
   $0 attach boss1           # 現在のプロジェクトのboss1にアタッチ
@@ -221,6 +227,372 @@ cmd_attach() {
     fi
 }
 
+# createコマンド: プロジェクト作成（project-init + setup統合）
+cmd_create() {
+    local project_name=""
+    local init_git=false
+    local remote_url=""
+    local args=()
+    
+    # 引数解析
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --git)
+                init_git=true
+                shift
+                ;;
+            --remote)
+                if [[ -z "$2" ]]; then
+                    error "--remoteオプションにはURLが必要です"
+                    return 1
+                fi
+                remote_url="$2"
+                shift 2
+                ;;
+            -*)
+                error "不明なオプション: $1"
+                return 1
+                ;;
+            *)
+                if [[ -z "$project_name" ]]; then
+                    project_name="$1"
+                else
+                    error "プロジェクト名が複数指定されています"
+                    return 1
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # プロジェクト名検証
+    if [[ -z "$project_name" ]]; then
+        error "プロジェクト名を指定してください"
+        echo "使用方法: $0 create <project-name> [--git] [--remote URL]"
+        return 1
+    fi
+    
+    # プロジェクト名の形式チェック
+    if [[ ! "$project_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        error "プロジェクト名には英数字、ハイフン、アンダースコアのみ使用できます"
+        return 1
+    fi
+    
+    # 既存プロジェクトチェック
+    if [[ -d "projects/$project_name" ]]; then
+        error "プロジェクト '$project_name' は既に存在します"
+        return 1
+    fi
+    
+    info "プロジェクト '$project_name' を作成中..."
+    
+    # Step 1: プロジェクト構造作成（project-init相当）
+    info "ディレクトリ構造を作成中..."
+    
+    # プロジェクトディレクトリ構造作成
+    local project_dir="projects/$project_name"
+    
+    # ディレクトリ作成
+    mkdir -p "$project_dir"/{workspace/{president,boss1,worker1,worker2,worker3},checkpoint,instructions/roles,config,shared/scripts}
+    
+    # プロジェクト指示書作成
+    cat > "$project_dir/instructions/project.md" << EOF
+# $project_name プロジェクト
+
+## プロジェクト概要
+- **プロジェクト名**: $project_name
+- **作成日**: $(date +"%Y-%m-%d")
+- **状態**: 初期化完了
+
+## プロジェクト構造
+\`\`\`
+$project_name/
+├── workspace/          # 開発ワークスペース
+│   ├── president/      # メインリポジトリ
+│   ├── boss1/         # Boss1ワークスペース
+│   ├── worker1/       # Worker1ワークスペース
+│   ├── worker2/       # Worker2ワークスペース
+│   └── worker3/       # Worker3ワークスペース
+├── checkpoint/        # プロジェクトチェックポイント
+├── instructions/      # プロジェクト指示書
+├── config/           # 設定ファイル
+└── shared/           # 共有リソース
+\`\`\`
+
+## 開発チーム
+- **President**: プロジェクト統括・調整
+- **Boss1**: チーム管理・統合
+- **Worker1-3**: 開発実装
+
+## 次のステップ
+1. プロジェクト要件の定義
+2. 技術スタックの選定
+3. 開発環境のセットアップ
+4. 実装開始
+EOF
+    
+    # 初期チェックポイント作成
+    cat > "$project_dir/checkpoint/initial_setup.md" << EOF
+# 🆕 $project_name - Initial Setup
+
+## プロジェクト作成情報
+- **作成日時**: $(date +"%Y-%m-%d %H:%M:%S")
+- **作成者**: Claude Code Communication
+- **状態**: 空のプロジェクト
+
+## ディレクトリ構造
+\`\`\`
+$project_name/
+├── workspace/          # すべて空
+├── checkpoint/        # このファイルのみ
+├── instructions/      # プロジェクト指示書
+├── config/           # 空
+└── shared/           # 空
+\`\`\`
+
+## 次のアクション
+ユーザーの指示を待機中
+EOF
+    
+    # ワークスペースREADME作成
+    for workspace in president boss1 worker1 worker2 worker3; do
+        cat > "$project_dir/workspace/$workspace/README.md" << EOF
+# $workspace Workspace
+
+This is the $workspace workspace for the $project_name project.
+
+## Status
+🚧 Empty workspace - ready for development
+
+## Next Steps
+- Define workspace-specific requirements
+- Set up development environment
+- Begin implementation
+EOF
+    done
+    
+    # .gitignore作成
+    cat > "$project_dir/.gitignore" << EOF
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Workspace - managed as separate repositories
+workspace/
+EOF
+    
+    # Git初期化（オプション）
+    if [[ "$init_git" == true ]]; then
+        cd "$project_dir"
+        git init
+        git branch -m main
+        git add .
+        git commit -m "Initial project structure
+
+Project management repository for $project_name
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+        
+        if [[ -n "$remote_url" ]]; then
+            git remote add origin "${remote_url}/${project_name}-project.git"
+            info "Project remote added: ${remote_url}/${project_name}-project.git"
+        fi
+        
+        # president workspace初期化
+        cd workspace/president
+        git init
+        git branch -m main
+        
+        cat > README.md << EOF
+# $project_name
+
+Main development repository for $project_name project.
+
+## Project Status
+
+🚧 Initial setup phase
+
+## Getting Started
+
+Development setup instructions will be added here.
+
+## Related Repositories
+
+- Project Management: ${remote_url:+${remote_url}/${project_name}-project.git}
+
+## License
+
+MIT License
+EOF
+        
+        git add README.md
+        git commit -m "Initial commit
+
+Main development repository for $project_name
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+        
+        if [[ -n "$remote_url" ]]; then
+            git remote add origin "${remote_url}/${project_name}.git"
+            info "President remote added: ${remote_url}/${project_name}.git"
+        fi
+        
+        cd ../../..
+    fi
+    
+    success "プロジェクト構造を作成しました"
+    
+    # Step 2: tmuxセッション作成（setup相当）
+    info "エージェントセッションを作成中..."
+    
+    # tmuxセッション作成処理を直接実行
+    local session_prefix="${project_name}-"
+    local multiagent_session="${session_prefix}multiagent"
+    local president_session="${session_prefix}president"
+    
+    # 既存セッションクリーンアップ
+    tmux kill-session -t "$multiagent_session" 2>/dev/null || true
+    tmux kill-session -t "$president_session" 2>/dev/null || true
+    
+    # 完了ファイルクリア
+    mkdir -p ./tmp
+    rm -f ./tmp/worker*_done.txt 2>/dev/null || true
+    
+    # multiagentセッション作成（4ペイン）
+    tmux new-session -d -s "$multiagent_session" -n "agents"
+    
+    # 2x2グリッド作成
+    tmux split-window -h -t "${multiagent_session}:0"
+    tmux select-pane -t "${multiagent_session}:0.0"
+    tmux split-window -v
+    tmux select-pane -t "${multiagent_session}:0.2"
+    tmux split-window -v
+    
+    # ペインタイトル設定
+    local pane_titles=("boss1" "worker1" "worker2" "worker3")
+    for i in {0..3}; do
+        tmux select-pane -t "${multiagent_session}:0.$i" -T "${pane_titles[$i]}"
+        tmux send-keys -t "${multiagent_session}:0.$i" "cd $(pwd)" C-m
+        
+        if [ $i -eq 0 ]; then
+            # boss1: 赤色
+            tmux send-keys -t "${multiagent_session}:0.$i" "export PS1='(\[\033[1;31m\]${pane_titles[$i]}\[\033[0m\]) \[\033[1;32m\]\w\[\033[0m\]\$ '" C-m
+        else
+            # workers: 青色
+            tmux send-keys -t "${multiagent_session}:0.$i" "export PS1='(\[\033[1;34m\]${pane_titles[$i]}\[\033[0m\]) \[\033[1;32m\]\w\[\033[0m\]\$ '" C-m
+        fi
+        
+        tmux send-keys -t "${multiagent_session}:0.$i" "echo '=== ${pane_titles[$i]} エージェント ==='" C-m
+    done
+    
+    # presidentセッション作成
+    tmux new-session -d -s "$president_session"
+    tmux send-keys -t "$president_session" "cd $(pwd)" C-m
+    tmux send-keys -t "$president_session" "export PS1='(\[\033[1;35m\]PRESIDENT\[\033[0m\]) \[\033[1;32m\]\w\[\033[0m\]\$ '" C-m
+    tmux send-keys -t "$president_session" "echo '=== PRESIDENT セッション ==='" C-m
+    
+    success "エージェントセッションを作成しました"
+    
+    # Step 3: プロジェクトに自動切り替え
+    info "プロジェクト '$project_name' に切り替え中..."
+    echo "$project_name" > .current-project
+    
+    success "プロジェクト '$project_name' の作成が完了しました！"
+    echo ""
+    info "次のステップ:"
+    echo "  1. ./bin/project attach president   # プレジデントセッションにアタッチ"
+    echo "  2. ./bin/claude-startup             # Claude Codeエージェントを起動"
+    echo ""
+    info "または、マルチエージェント画面を確認:"
+    echo "  ./bin/project attach multiagent     # 4分割画面で全エージェントを表示"
+    echo ""
+    info "プロジェクトディレクトリ: projects/$project_name"
+}
+
+# setupコマンド: デフォルトセッション作成
+cmd_setup() {
+    info "デフォルトセッション（プロジェクトなし）を作成中..."
+    
+    # .current-projectファイルを削除
+    rm -f .current-project
+    
+    # 既存セッションクリーンアップ
+    tmux kill-session -t "multiagent" 2>/dev/null || true
+    tmux kill-session -t "president" 2>/dev/null || true
+    
+    # 完了ファイルクリア
+    mkdir -p ./tmp
+    rm -f ./tmp/worker*_done.txt 2>/dev/null || true
+    
+    # multiagentセッション作成（4ペイン）
+    tmux new-session -d -s "multiagent" -n "agents"
+    
+    # 2x2グリッド作成
+    tmux split-window -h -t "multiagent:0"
+    tmux select-pane -t "multiagent:0.0"
+    tmux split-window -v
+    tmux select-pane -t "multiagent:0.2"
+    tmux split-window -v
+    
+    # ペインタイトル設定
+    local pane_titles=("boss1" "worker1" "worker2" "worker3")
+    for i in {0..3}; do
+        tmux select-pane -t "multiagent:0.$i" -T "${pane_titles[$i]}"
+        tmux send-keys -t "multiagent:0.$i" "cd $(pwd)" C-m
+        
+        if [ $i -eq 0 ]; then
+            # boss1: 赤色
+            tmux send-keys -t "multiagent:0.$i" "export PS1='(\[\033[1;31m\]${pane_titles[$i]}\[\033[0m\]) \[\033[1;32m\]\w\[\033[0m\]\$ '" C-m
+        else
+            # workers: 青色
+            tmux send-keys -t "multiagent:0.$i" "export PS1='(\[\033[1;34m\]${pane_titles[$i]}\[\033[0m\]) \[\033[1;32m\]\w\[\033[0m\]\$ '" C-m
+        fi
+        
+        tmux send-keys -t "multiagent:0.$i" "echo '=== ${pane_titles[$i]} エージェント ==='" C-m
+    done
+    
+    # presidentセッション作成
+    tmux new-session -d -s "president"
+    tmux send-keys -t "president" "cd $(pwd)" C-m
+    tmux send-keys -t "president" "export PS1='(\[\033[1;35m\]PRESIDENT\[\033[0m\]) \[\033[1;32m\]\w\[\033[0m\]\$ '" C-m
+    tmux send-keys -t "president" "echo '=== PRESIDENT セッション ==='" C-m
+    
+    success "デフォルトセッションを作成しました"
+    echo ""
+    info "次のステップ:"
+    echo "  1. ./bin/project attach president   # プレジデントセッションにアタッチ"
+    echo "  2. ./bin/claude-startup             # Claude Codeエージェントを起動"
+    echo ""
+    info "または、マルチエージェント画面を確認:"
+    echo "  ./bin/project attach multiagent     # 4分割画面で全エージェントを表示"
+}
+
 # stopコマンド: セッション停止
 cmd_stop() {
     local arg="$1"
@@ -334,6 +706,12 @@ main() {
     shift || true
     
     case "$command" in
+        create)
+            cmd_create "$@"
+            ;;
+        setup)
+            cmd_setup
+            ;;
         list)
             cmd_list
             ;;
