@@ -290,7 +290,13 @@ cmd_attach() {
     # セッション存在確認
     if ! tmux has-session -t "$session_name" 2>/dev/null; then
         error "セッション '$session_name' が見つかりません"
-        info "先に './bin/setup' でセッションを作成してください"
+        if [[ -n "$current_project" ]]; then
+            info "先に './bin/project setup' でセッションを作成してください"
+        else
+            info "先に以下のいずれかを実行してください:"
+            echo "  ./bin/project create <project-name>  # 新規プロジェクト作成"
+            echo "  ./bin/project setup                  # デフォルトセッション作成"
+        fi
         return 1
     fi
     
