@@ -15,22 +15,62 @@ get_project_prefix() {
 # エージェント→tmuxターゲット マッピング（プロジェクト対応）
 get_agent_target() {
     local prefix=$(get_project_prefix)
-    case "$1" in
+    local agent="$1"
+    
+    case "$agent" in
         "president") echo "${prefix}president" ;;
         "boss1") echo "${prefix}multiagent:0.0" ;;
-        "worker1") echo "${prefix}multiagent:0.1" ;;
-        "worker2") echo "${prefix}multiagent:0.2" ;;
-        "worker3") echo "${prefix}multiagent:0.3" ;;
+        worker*)
+            # worker番号を動的に処理（worker1, worker2, ... worker20）
+            if [[ "$agent" =~ ^worker([0-9]+)$ ]]; then
+                local worker_num="${BASH_REMATCH[1]}"
+                local pane_index=$worker_num  # boss1が0なので、worker1は1
+                echo "${prefix}multiagent:0.$pane_index"
+            else
+                echo ""
+            fi
+            ;;
         *) echo "" ;;
     esac
 }
 
-# エージェントグループを展開
+# エージェントグループを展開（worker数を動的に取得）
 expand_agent_group() {
-    case "$1" in
-        "all") echo "president boss1 worker1 worker2 worker3" ;;
-        "team") echo "boss1 worker1 worker2 worker3" ;;
-        "workers") echo "worker1 worker2 worker3" ;;
+    local group="$1"
+    local workers=""
+    
+    # 現在のプロジェクトのworker数を取得
+    local worker_count=3  # デフォルト
+    local prefix=$(get_project_prefix)
+    
+    if [[ -n "$prefix" ]]; then
+        # プロジェクト設定ファイルから読み込み
+        local project="${prefix%%-}"
+        local config_file="projects/$project/config/project.conf"
+        if [[ -f "$config_file" ]]; then
+            source "$config_file"
+            worker_count="${WORKER_COUNT:-3}"
+        fi
+    else
+        # デフォルトセッションの場合、実際のペイン数を確認
+        if tmux has-session -t multiagent 2>/dev/null; then
+            local pane_count=$(tmux list-panes -t multiagent:0 -F "#{pane_index}" | wc -l)
+            if [[ $pane_count -gt 1 ]]; then
+                worker_count=$((pane_count - 1))  # boss1を除く
+            fi
+        fi
+    fi
+    
+    # worker番号のリストを生成
+    for i in $(seq 1 $worker_count); do
+        workers+="worker$i "
+    done
+    workers=$(echo $workers | xargs)  # 末尾の空白を削除
+    
+    case "$group" in
+        "all") echo "president boss1 $workers" ;;
+        "team") echo "boss1 $workers" ;;
+        "workers") echo "$workers" ;;
         *) echo "$1" ;;
     esac
 }
@@ -69,6 +109,7 @@ EOF
 show_agents() {
     local prefix=$(get_project_prefix)
     local project_info=""
+    local workers=$(expand_agent_group "workers")
     
     if [ -n "$prefix" ]; then
         project_info=" (プロジェクト: ${prefix%%-})"
@@ -78,15 +119,21 @@ show_agents() {
     echo "=========================="
     echo "  president → ${prefix}president:0     (プロジェクト統括責任者)"
     echo "  boss1     → ${prefix}multiagent:0.0  (チームリーダー)"
-    echo "  worker1   → ${prefix}multiagent:0.1  (実行担当者A)"
-    echo "  worker2   → ${prefix}multiagent:0.2  (実行担当者B)" 
-    echo "  worker3   → ${prefix}multiagent:0.3  (実行担当者C)"
+    
+    # 動的にworkerをリスト
+    local i=1
+    for worker in $workers; do
+        local letter=$(echo -n {A..Z} | cut -d' ' -f$i)
+        echo "  $worker   → ${prefix}multiagent:0.$i  (実行担当者$letter)"
+        ((i++))
+    done
+    
     echo ""
     echo "📋 利用可能なグループ:"
     echo "=========================="
     echo "  all      - 全員"
     echo "  team     - チーム（boss1 + workers）"
-    echo "  workers  - ワーカー全員"
+    echo "  workers  - ワーカー全員（$workers）"
 }
 
 # ログ記録

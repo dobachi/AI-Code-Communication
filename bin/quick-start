@@ -25,6 +25,7 @@ show_help() {
 オプション:
   --git                           Git リポジトリを初期化
   --remote URL                    リモートリポジトリURLを設定
+  --workers N                     Worker数を指定（デフォルト: 3）
   --default                       デフォルトセッション（プロジェクトなし）を使用
   --no-start                      AI起動をスキップ（セッション作成のみ）
   -h, --help                      このヘルプを表示
@@ -32,7 +33,9 @@ show_help() {
 使用例:
   $0 myproject                    # プロジェクト作成→AI起動
   $0 myproject --git              # Git付きプロジェクト作成→AI起動
+  $0 myproject --workers 5        # 5人のworkerでプロジェクト作成
   $0 --default                    # デフォルトセッション→AI起動
+  $0 --default --workers 4        # 4人のworkerでデフォルトセッション
   $0 myproject --no-start         # プロジェクト作成のみ
 
 このスクリプトは以下を自動実行します:
