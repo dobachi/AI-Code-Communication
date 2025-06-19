@@ -205,19 +205,46 @@ project_structure:
     instructions:
       description: プロジェクト固有指示書
       files:
-        - project.md  # プロジェクト固有ルール
-        - roles/      # 役割別拡張指示
+        - president.md    # プロジェクト固有ビジョン
+        - boss.md        # プロジェクト固有チーム体制
+        - worker{N}.md   # worker固有専門領域
+        - setup-wizard.md # 初期設定ウィザード
         
     config:
       description: プロジェクト設定
       files:
-        - worktree.yaml  # worktree設定
+        - project.conf  # 基本設定（名前、worker数等）
         
     shared:
       description: プロジェクト共有リソース
       subdirs:
         - scripts/    # 共通スクリプト
         - templates/  # テンプレート
+```
+
+### プロジェクト初期設定
+```yaml
+project_initialization:
+  detection: ".needs-setup ファイルの存在を確認"
+  
+  auto_wizard:
+    trigger: 新規プロジェクト初回president起動時
+    reference: "@instructions/president-init.md"
+    wizard_file: "projects/{project}/instructions/setup-wizard.md"
+    
+  setup_process:
+    1_collect_info: "setup-wizard.mdの質問で情報収集"
+    2_update_instructions: "収集した情報で各指示書を更新"
+    3_remove_flag: ".needs-setupファイルを削除"
+    4_notify_team: "boss1に設定完了を通知"
+    
+  required_info:
+    - プロジェクトの目的とビジョン
+    - ターゲットユーザー
+    - 成功基準
+    - 技術スタック
+    - 各workerの専門領域
+    - 開発方針とコーディング規約
 ```
 
 ### 作業ディレクトリ

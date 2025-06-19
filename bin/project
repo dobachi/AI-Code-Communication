@@ -465,111 +465,46 @@ generate_project_instructions() {
     local project_dir="$1"
     local project_name="$2"
     local worker_count="${3:-3}"
+    local instructions_dir="$project_dir/instructions"
     
-    # rolesディレクトリ作成
-    mkdir -p "$project_dir/instructions/roles"
+    # Create instructions directory
+    mkdir -p "$instructions_dir"
     
-    # president指示書生成
-    generate_instruction_file "president" "$project_dir" "$project_name" "$worker_count"
-    
-    # boss1指示書生成
-    generate_instruction_file "boss" "$project_dir" "$project_name" "$worker_count"
-    
-    # worker指示書生成
-    generate_worker_instructions "$project_dir" "$project_name" "$worker_count"
-}
-
-# 個別指示書ファイル生成
-generate_instruction_file() {
-    local role="$1"
-    local project_dir="$2"
-    local project_name="$3"
-    local worker_count="$4"
-    
-    local template_file="projects/templates/instructions/${role}.md"
-    local output_file="$project_dir/instructions/roles/${role}1.md"
-    
-    # boss -> boss1のマッピング
-    if [[ "$role" == "boss" ]]; then
-        output_file="$project_dir/instructions/roles/boss1.md"
-    fi
-    
-    # presidentの場合はroles/president.mdに
-    if [[ "$role" == "president" ]]; then
-        output_file="$project_dir/instructions/roles/president.md"
-    fi
-    
-    # テンプレートが存在しない場合はシステムレベルから取得
-    if [[ ! -f "$template_file" ]]; then
-        local current_mode="iterative"
-        if [[ -L "instructions/boss.md" ]]; then
-            current_mode=$(readlink instructions/boss.md | xargs dirname | xargs basename)
+    # Copy and customize templates
+    for role in president boss worker; do
+        local template="projects/templates/instructions/${role}.md"
+        if [[ -f "$template" ]]; then
+            local content=$(cat "$template")
+            # Replace template variables
+            content="${content//\{\{PROJECT_NAME\}\}/$project_name}"
+            content="${content//\{\{CREATED_DATE\}\}/$(date +%Y-%m-%d)}"
+            content="${content//\{\{WORKER_COUNT\}\}/$worker_count}"
+            
+            if [[ "$role" == "worker" ]]; then
+                # Generate worker instructions for each worker
+                for i in $(seq 1 $worker_count); do
+                    local worker_content="${content//\{\{WORKER_NUMBER\}\}/$i}"
+                    echo "$worker_content" > "$instructions_dir/worker${i}.md"
+                done
+            else
+                echo "$content" > "$instructions_dir/${role}.md"
+            fi
         fi
-        
-        if [[ -f "instructions/$current_mode/${role}.md" ]]; then
-            template_file="instructions/$current_mode/${role}.md"
-        else
-            error "${role}テンプレートが見つかりません"
-            return 1
-        fi
-    fi
-    
-    # テンプレートをコピーして変数を展開
-    sed -e "s/{{PROJECT_NAME}}/$project_name/g" \
-        -e "s/{{CREATED_DATE}}/$(date +%Y-%m-%d)/g" \
-        -e "s/{{WORKER_COUNT}}/$worker_count/g" \
-        "$template_file" > "$output_file"
-}
-
-# worker指示書の動的生成
-generate_worker_instructions() {
-    local project_dir="$1"
-    local project_name="$2"
-    local worker_count="${3:-3}"
-    local template_file="$project_dir/instructions/roles/worker.md"
-    
-    # プロジェクト固有のテンプレートがない場合は、グローバルテンプレートを使用
-    if [[ ! -f "$template_file" ]]; then
-        template_file="projects/templates/instructions/worker.md"
-    fi
-    
-    # テンプレートが存在しない場合は現在のモードから取得
-    if [[ ! -f "$template_file" ]]; then
-        local current_mode="iterative"
-        if [[ -L "instructions/boss.md" ]]; then
-            current_mode=$(readlink instructions/boss.md | xargs dirname | xargs basename)
-        fi
-        
-        if [[ -f "instructions/$current_mode/worker.md" ]]; then
-            template_file="instructions/$current_mode/worker.md"
-        else
-            error "workerテンプレートが見つかりません"
-            return 1
-        fi
-    fi
-    
-    # rolesディレクトリ作成
-    mkdir -p "$project_dir/instructions/roles"
-    
-    # 各workerの指示書を生成
-    for i in $(seq 1 "$worker_count"); do
-        local worker_file="$project_dir/instructions/roles/worker$i.md"
-        
-        # テンプレートをコピーして変数を展開
-        sed -e "s/{{WORKER_NUMBER}}/$i/g" \
-            -e "s/{{PROJECT_NAME}}/$project_name/g" \
-            -e "s/{{CREATED_DATE}}/$(date +%Y-%m-%d)/g" \
-            -e "s/{{WORKER_COUNT}}/$worker_count/g" \
-            "$template_file" > "$worker_file"
-        
-        # プロジェクト固有のカスタマイズを追加
-        cat >> "$worker_file" << EOF
-
-## プロジェクト固有設定
-- Worker番号: $i / $worker_count
-- 役割: プロジェクトに応じてboss1が動的に割り当て
-EOF
     done
+    
+    # Copy setup wizard
+    if [[ -f "projects/templates/instructions/setup-wizard.md" ]]; then
+        local wizard_content=$(cat "projects/templates/instructions/setup-wizard.md")
+        wizard_content="${wizard_content//\{\{PROJECT_NAME\}\}/$project_name}"
+        wizard_content="${wizard_content//\{\{WORKER_COUNT\}\}/$worker_count}"
+        echo "$wizard_content" > "$instructions_dir/setup-wizard.md"
+    fi
+    
+    # Create initialization flag
+    touch "$project_dir/.needs-setup"
+    
+    echo "✅ プロジェクト固有指示書を生成しました"
+    echo "📝 初回起動時にセットアップウィザードが実行されます"
 }
 
 # createコマンド: プロジェクト作成（project-init + setup統合）
