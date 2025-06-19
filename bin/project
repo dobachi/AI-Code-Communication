@@ -44,6 +44,8 @@ show_help() {
     [options] --git         Git リポジトリを初期化
               --remote URL  リモートリポジトリURLを設定
               --workers N   Worker数を指定（デフォルト: 3）
+  config <project-name>     プロジェクト設定を変更
+    [options] --workers N   Worker数を変更
   === セッション管理 ===
   start [project-name]      セッションを開始
     [options] --workers N   Worker数を指定（デフォルト: 3）
@@ -71,6 +73,7 @@ show_help() {
   $0 list                   # 実行中のプロジェクト一覧
   $0 switch myproject       # myprojectに切り替え
   $0 attach boss1           # 現在のプロジェクトのboss1にアタッチ
+  $0 config myproject --workers 5  # Worker数を5に変更
   $0 stop myproject         # myprojectを停止
   $0 delete myproject       # myprojectを完全削除
 
@@ -605,6 +608,97 @@ EOF
     fi
 }
 
+# Worker指示書の整合性チェックと生成
+check_and_generate_worker_instructions() {
+    local project_dir="$1"
+    local project_name="$2"
+    local worker_count="$3"
+    local instructions_dir="$project_dir/instructions"
+    
+    # 指示書ディレクトリがない場合はスキップ
+    if [[ ! -d "$instructions_dir" ]]; then
+        return 0
+    fi
+    
+    # 既存のworker指示書をチェック
+    local existing_workers=()
+    for i in $(seq 1 20); do
+        if [[ -f "$instructions_dir/worker${i}.md" ]]; then
+            existing_workers+=($i)
+        fi
+    done
+    
+    # 必要なworker指示書がすべて存在するか確認
+    local missing_workers=()
+    for i in $(seq 1 $worker_count); do
+        if [[ ! -f "$instructions_dir/worker${i}.md" ]]; then
+            missing_workers+=($i)
+        fi
+    done
+    
+    # 不足がなければ終了
+    if [[ ${#missing_workers[@]} -eq 0 ]]; then
+        return 0
+    fi
+    
+    info "Worker指示書の不足を検出しました: worker${missing_workers[*]}"
+    
+    # ベースとなる指示書を決定
+    local base_instruction=""
+    if [[ ${#existing_workers[@]} -gt 0 ]]; then
+        # 既存の最大番号のworker指示書をベースにする
+        local max_worker=$(printf '%s\n' "${existing_workers[@]}" | sort -nr | head -1)
+        base_instruction="$instructions_dir/worker${max_worker}.md"
+        info "既存のworker${max_worker}.mdをベースに新しい指示書を生成します"
+    elif [[ -f "projects/templates/instructions/worker.md" ]]; then
+        # テンプレートから生成
+        base_instruction="projects/templates/instructions/worker.md"
+        info "テンプレートから新しい指示書を生成します"
+    else
+        warning "Worker指示書のベースが見つかりません。スキップします"
+        return 0
+    fi
+    
+    # 不足しているworker指示書を生成
+    for worker_num in "${missing_workers[@]}"; do
+        local new_instruction="$instructions_dir/worker${worker_num}.md"
+        
+        if [[ -f "$base_instruction" ]]; then
+            # ベース指示書をコピーして番号を置換
+            local content=$(cat "$base_instruction")
+            
+            # worker番号を置換（例: worker1 -> worker5）
+            if [[ "$base_instruction" =~ worker([0-9]+)\.md ]]; then
+                local old_num="${BASH_REMATCH[1]}"
+                content="${content//worker$old_num/worker$worker_num}"
+                content="${content//Worker$old_num/Worker$worker_num}"
+                content="${content//WORKER$old_num/WORKER$worker_num}"
+            fi
+            
+            # テンプレート変数を置換
+            content="${content//\{\{WORKER_NUMBER\}\}/$worker_num}"
+            content="${content//\{\{PROJECT_NAME\}\}/$project_name}"
+            content="${content//\{\{CREATED_DATE\}\}/$(date +%Y-%m-%d)}"
+            content="${content//\{\{WORKER_COUNT\}\}/$worker_count}"
+            
+            # 自動生成メモを追加
+            echo "$content" > "$new_instruction"
+            echo "" >> "$new_instruction"
+            echo "---" >> "$new_instruction"
+            echo "<!-- 自動生成: $(date +%Y-%m-%d\ %H:%M:%S) -->" >> "$new_instruction"
+            echo "<!-- ベース: $(basename "$base_instruction") -->" >> "$new_instruction"
+            echo "<!-- Worker数変更により自動生成されました -->" >> "$new_instruction"
+            
+            success "worker${worker_num}.mdを生成しました"
+        fi
+    done
+    
+    # 初回起動フラグがある場合は更新
+    if [[ -f "$project_dir/.needs-setup" ]]; then
+        touch "$project_dir/.needs-setup"
+    fi
+}
+
 # プロジェクト指示書の生成（president, boss1, workers）
 generate_project_instructions() {
     local project_dir="$1"
@@ -1100,6 +1194,9 @@ cmd_start() {
         info "プロジェクト '$project_name' のセッションを開始中..."
         info "Worker数: $worker_count"
         
+        # Worker指示書の整合性チェック
+        check_and_generate_worker_instructions "$project_dir" "$project_name" "$worker_count"
+        
         # プロジェクトを現在のプロジェクトに設定
         echo "$project_name" > .current-project
         
@@ -1454,6 +1551,174 @@ cmd_stop() {
     esac
 }
 
+# configコマンドのヘルプ
+show_help_config() {
+    cat << EOF
+プロジェクト設定変更コマンド
+
+使用方法:
+  $0 config <project-name> [options]
+  $0 config --current [options]
+
+引数:
+  project-name              設定を変更するプロジェクト名
+
+オプション:
+  --current                 現在のプロジェクトの設定を変更
+  --workers N               Worker数を変更（範囲: 1-20）
+  --show                    現在の設定を表示
+  --help                    このヘルプを表示
+
+例:
+  $0 config myproject --workers 5        # myprojectのWorker数を5に変更
+  $0 config --current --workers 4        # 現在のプロジェクトのWorker数を4に変更
+  $0 config myproject --show             # myprojectの設定を表示
+
+説明:
+  プロジェクトの設定を変更します。
+  Worker数を変更した場合、次回のセッション開始時に適用されます。
+  実行中のセッションには影響しません。
+EOF
+}
+
+# configコマンド: プロジェクト設定変更
+cmd_config() {
+    local project_name=""
+    local worker_count=""
+    local show_config=false
+    local use_current=false
+    
+    # 引数解析
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help|-h)
+                show_help_config
+                return 0
+                ;;
+            --current)
+                use_current=true
+                shift
+                ;;
+            --workers)
+                if [[ -z "$2" ]] || ! [[ "$2" =~ ^[0-9]+$ ]]; then
+                    error "--workersオプションには数値が必要です"
+                    return 1
+                fi
+                worker_count="$2"
+                if [[ $worker_count -lt 1 ]] || [[ $worker_count -gt 20 ]]; then
+                    error "Worker数は1-20の範囲で指定してください"
+                    return 1
+                fi
+                shift 2
+                ;;
+            --show)
+                show_config=true
+                shift
+                ;;
+            -*)
+                error "不明なオプション: $1"
+                return 1
+                ;;
+            *)
+                if [[ -z "$project_name" ]]; then
+                    project_name="$1"
+                else
+                    error "引数が多すぎます"
+                    return 1
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # プロジェクト名の確定
+    if [[ "$use_current" == true ]]; then
+        project_name=$(get_current_project)
+        if [[ -z "$project_name" ]]; then
+            error "現在のプロジェクトが設定されていません"
+            return 1
+        fi
+    elif [[ -z "$project_name" ]]; then
+        error "プロジェクト名を指定してください"
+        echo "使用方法: $0 config <project-name> [options]"
+        return 1
+    fi
+    
+    # プロジェクト存在確認
+    local project_dir="projects/$project_name"
+    if [[ ! -d "$project_dir" ]]; then
+        error "プロジェクト '$project_name' が存在しません"
+        return 1
+    fi
+    
+    local config_file="$project_dir/config/project.conf"
+    
+    # 設定表示
+    if [[ "$show_config" == true ]]; then
+        info "プロジェクト '$project_name' の設定:"
+        if [[ -f "$config_file" ]]; then
+            cat "$config_file" | while IFS= read -r line; do
+                if [[ ! "$line" =~ ^# ]] && [[ -n "$line" ]]; then
+                    echo "  $line"
+                fi
+            done
+        else
+            warning "設定ファイルが存在しません"
+        fi
+        return 0
+    fi
+    
+    # 何も変更するものがない場合
+    if [[ -z "$worker_count" ]]; then
+        error "変更する設定を指定してください"
+        echo "使用方法: $0 config <project-name> --workers N"
+        return 1
+    fi
+    
+    # 設定ファイルの更新
+    if [[ -f "$config_file" ]]; then
+        # 既存の設定を読み込み
+        local temp_file="${config_file}.tmp"
+        local worker_updated=false
+        
+        while IFS= read -r line; do
+            if [[ "$line" =~ ^WORKER_COUNT= ]]; then
+                echo "WORKER_COUNT=$worker_count" >> "$temp_file"
+                worker_updated=true
+            else
+                echo "$line" >> "$temp_file"
+            fi
+        done < "$config_file"
+        
+        # WORKER_COUNTが存在しなかった場合は追加
+        if [[ "$worker_updated" == false ]]; then
+            echo "WORKER_COUNT=$worker_count" >> "$temp_file"
+        fi
+        
+        mv "$temp_file" "$config_file"
+    else
+        # 新規作成
+        cat > "$config_file" << EOF
+# プロジェクト設定
+PROJECT_NAME=$project_name
+WORKER_COUNT=$worker_count
+CREATED_DATE=$(date +%Y-%m-%d)
+TEMPLATE_VERSION=1.0
+EOF
+    fi
+    
+    success "プロジェクト '$project_name' のWorker数を $worker_count に変更しました"
+    
+    # 実行中セッションの確認
+    if tmux has-session -t "${project_name}-multiagent" 2>/dev/null || \
+       tmux has-session -t "${project_name}-president" 2>/dev/null; then
+        warning "実行中のセッションがあります。変更は次回のセッション開始時に適用されます"
+        echo "適用するには:"
+        echo "  ./bin/project stop $project_name"
+        echo "  ./bin/project start $project_name"
+    fi
+}
+
 # メイン処理
 main() {
     local command="$1"
@@ -1483,6 +1748,9 @@ main() {
             ;;
         delete)
             cmd_delete "$@"
+            ;;
+        config)
+            cmd_config "$@"
             ;;
         help|--help|-h|"")
             show_help

@@ -51,6 +51,12 @@ role_assignment:
   president: "@instructions/iterative/president.md"
   boss1: "@instructions/iterative/boss.md"
   workers: "@instructions/iterative/worker.md"
+  
+  # プロジェクト初回起動時の特別指示
+  initialization:
+    president: "@instructions/iterative/president-init.md"
+    boss1: "@instructions/iterative/boss-init.md"
+    workers: "@instructions/iterative/worker-init.md"
 ```
 
 ## 指示書モード
@@ -261,6 +267,41 @@ working_directories:
   workers:
     pattern: "workspace/worker[1-3]/"
     purpose: 機能別ブランチで独立作業
+```
+
+### プロジェクト初回起動時の自動初期化
+```yaml
+project_initialization:
+  detection:
+    # 以下の条件で初回起動を検知
+    - .needs-setupファイルの存在
+    - 指示書内の[未設定:]マーカー
+    - presidentがプロジェクト名を初めて認識
+    
+  execution_order:
+    1_president:
+      - president-init.mdに従ってセットアップウィザード実行
+      - プロジェクト情報を収集
+      - 指示書を更新
+      - boss1に初期設定完了を通知
+      
+    2_boss1:
+      - boss-init.mdに従ってworker役割分担を決定
+      - 各worker指示書を更新
+      - 自身の指示書も更新
+      - 各workerに役割を通知
+      
+    3_workers:
+      - worker-init.mdに従って環境セットアップ
+      - 担当領域の理解
+      - 開発環境の準備
+      - boss1に準備完了を報告
+      
+  important_notes:
+    - この初期化はプロジェクト生成後の最初の起動時に1度だけ実行
+    - ユーザーからの指示よりも優先される
+    - セットアップ完了後に.needs-setupファイルを削除
+    - 指示書の更新は既存内容を上書きせず、[未設定:]部分のみ更新
 ```
 
 ### 作業完了時のチェックポイント
