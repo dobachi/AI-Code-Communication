@@ -44,14 +44,15 @@ show_help() {
     [options] --git         Git リポジトリを初期化
               --remote URL  リモートリポジトリURLを設定
               --workers N   Worker数を指定（デフォルト: 3）
-  setup [--workers N]       デフォルトセッション作成（プロジェクトなし）
+  === セッション管理 ===
+  start [project-name]      セッションを開始
+    [options] --workers N   Worker数を指定（デフォルト: 3）
+              ※プロジェクト名を指定しない場合はデフォルトセッション
   list [--all]              実行中のプロジェクト一覧を表示
                             --all: 全プロジェクト（実行中でないものも含む）
   current                   現在のプロジェクトを表示
   switch <project-name>     プロジェクトを切り替え
   switch --clear            プロジェクトコンテキストをクリア
-
-  === セッション操作 ===
   attach <agent-name>       エージェントのセッションにアタッチ
     agent-name: president, boss1, worker1-3, multiagent
   stop [project-name]       プロジェクトのセッションを停止
@@ -64,7 +65,8 @@ show_help() {
   help                      このヘルプを表示
 
 使用例:
-  $0 setup                  # デフォルトセッション作成
+  $0 start                  # デフォルトセッション開始
+  $0 start myproject        # myprojectのセッション開始
   $0 create myproject --git # myprojectを作成（Git付き）
   $0 list                   # 実行中のプロジェクト一覧
   $0 switch myproject       # myprojectに切り替え
@@ -291,11 +293,11 @@ cmd_attach() {
     if ! tmux has-session -t "$session_name" 2>/dev/null; then
         error "セッション '$session_name' が見つかりません"
         if [[ -n "$current_project" ]]; then
-            info "先に './bin/project setup' でセッションを作成してください"
+            info "先に './bin/project start' でセッションを開始してください"
         else
             info "先に以下のいずれかを実行してください:"
             echo "  ./bin/project create <project-name>  # 新規プロジェクト作成"
-            echo "  ./bin/project setup                  # デフォルトセッション作成"
+            echo "  ./bin/project start                  # デフォルトセッション開始"
         fi
         return 1
     fi
@@ -839,8 +841,9 @@ EOF
     info "プロジェクトディレクトリ: projects/$project_name"
 }
 
-# setupコマンド: デフォルトセッション作成
-cmd_setup() {
+# startコマンド: セッション開始
+cmd_start() {
+    local project_name=""
     local worker_count=3
     
     # 引数解析
@@ -858,29 +861,78 @@ cmd_setup() {
                 fi
                 shift 2
                 ;;
-            *)
+            -*)
                 error "不明なオプション: $1"
                 return 1
+                ;;
+            *)
+                if [[ -z "$project_name" ]]; then
+                    project_name="$1"
+                else
+                    error "引数が多すぎます"
+                    return 1
+                fi
+                shift
                 ;;
         esac
     done
     
-    info "デフォルトセッション（プロジェクトなし）を作成中..."
-    info "Worker数: $worker_count"
+    # プロジェクト名が指定された場合
+    if [[ -n "$project_name" ]]; then
+        # プロジェクト存在確認
+        if [[ ! -d "projects/$project_name" ]]; then
+            error "プロジェクト '$project_name' が見つかりません"
+            info "先に './bin/project create $project_name' でプロジェクトを作成してください"
+            return 1
+        fi
+        
+        # プロジェクト設定を読み込み
+        local project_dir="projects/$project_name"
+        if [[ -f "$project_dir/config/project.conf" ]]; then
+            source "$project_dir/config/project.conf"
+            # 設定ファイルからworker数を読み込み（--workersが指定されていない場合）
+            if [[ $worker_count -eq 3 ]] && [[ -n "$WORKER_COUNT" ]]; then
+                worker_count="$WORKER_COUNT"
+            fi
+        fi
+        
+        info "プロジェクト '$project_name' のセッションを開始中..."
+        info "Worker数: $worker_count"
+        
+        # プロジェクトを現在のプロジェクトに設定
+        echo "$project_name" > .current-project
+        
+        # セッション作成
+        create_multiagent_session "$project_name" "$worker_count"
+        
+        # presidentセッション作成
+        local president_session="${project_name}-president"
+        tmux new-session -d -s "$president_session"
+        tmux send-keys -t "$president_session" "cd $(pwd)" C-m
+        tmux send-keys -t "$president_session" "export PS1='(\[\033[1;35m\]PRESIDENT\[\033[0m\]) \[\033[1;32m\]\w\[\033[0m\]\$ '" C-m
+        tmux send-keys -t "$president_session" "echo '=== PRESIDENT セッション ==='" C-m
+        
+        success "プロジェクト '$project_name' のセッションを開始しました"
+    else
+        # デフォルトセッション
+        info "デフォルトセッション（プロジェクトなし）を開始中..."
+        info "Worker数: $worker_count"
+        
+        # .current-projectファイルを削除
+        rm -f .current-project
+        
+        # セッション作成
+        create_multiagent_session "" "$worker_count"
+        
+        # presidentセッション作成
+        tmux new-session -d -s "president"
+        tmux send-keys -t "president" "cd $(pwd)" C-m
+        tmux send-keys -t "president" "export PS1='(\[\033[1;35m\]PRESIDENT\[\033[0m\]) \[\033[1;32m\]\w\[\033[0m\]\$ '" C-m
+        tmux send-keys -t "president" "echo '=== PRESIDENT セッション ==='" C-m
+        
+        success "デフォルトセッションを開始しました"
+    fi
     
-    # .current-projectファイルを削除
-    rm -f .current-project
-    
-    # セッション作成
-    create_multiagent_session "" "$worker_count"
-    
-    # presidentセッション作成
-    tmux new-session -d -s "president"
-    tmux send-keys -t "president" "cd $(pwd)" C-m
-    tmux send-keys -t "president" "export PS1='(\[\033[1;35m\]PRESIDENT\[\033[0m\]) \[\033[1;32m\]\w\[\033[0m\]\$ '" C-m
-    tmux send-keys -t "president" "echo '=== PRESIDENT セッション ==='" C-m
-    
-    success "デフォルトセッションを作成しました"
     echo ""
     info "次のステップ:"
     echo "  1. ./bin/claude-startup             # Claude Codeエージェントを起動"
@@ -1135,8 +1187,8 @@ main() {
         create)
             cmd_create "$@"
             ;;
-        setup)
-            cmd_setup "$@"
+        start)
+            cmd_start "$@"
             ;;
         list)
             cmd_list "$@"

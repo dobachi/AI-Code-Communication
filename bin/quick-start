@@ -50,6 +50,7 @@ PROJECT_NAME=""
 USE_DEFAULT=false
 NO_START=false
 GIT_ARGS=()
+START_ARGS=()
 
 # 引数解析
 while [[ $# -gt 0 ]]; do
@@ -72,6 +73,15 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             GIT_ARGS+=("--remote" "$2")
+            shift 2
+            ;;
+        --workers)
+            if [[ -z "$2" ]] || ! [[ "$2" =~ ^[0-9]+$ ]]; then
+                error "--workersオプションには数値が必要です"
+                exit 1
+            fi
+            GIT_ARGS+=("--workers" "$2")
+            START_ARGS+=("--workers" "$2")
             shift 2
             ;;
         -h|--help)
@@ -114,7 +124,7 @@ echo ""
 # Step 1: プロジェクト/セッション作成
 if [[ "$USE_DEFAULT" == true ]]; then
     info "デフォルトセッションを作成中..."
-    if ! ./bin/project setup; then
+    if ! ./bin/project start "${START_ARGS[@]}"; then
         error "セッション作成に失敗しました"
         exit 1
     fi
