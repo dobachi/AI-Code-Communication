@@ -5,6 +5,48 @@
 
 set -e
 
+# ヘルプメッセージ
+show_help() {
+    cat << EOF
+Claude Code エージェント起動スクリプト
+
+使用方法:
+  $0 [project-name] [options]
+  $0 [options]
+
+引数:
+  project-name              起動するプロジェクト名
+                            （省略時は.current-projectから取得）
+
+オプション:
+  -h, --help                このヘルプを表示
+
+説明:
+  指定されたプロジェクト（またはデフォルトプロジェクト）のClaude Codeエージェントを
+  段階的に起動します。
+
+  1. Presidentセッションでclaude --dangerously-skip-permissionsを実行
+  2. Multiagentセッション（boss1, worker1-3）で同コマンドを実行
+  3. 各セッションのログイン状態を確認
+  4. 必要に応じてログインのガイダンスを表示
+
+例:
+  $0                        # 現在のプロジェクトでエージェント起動
+  $0 myproject              # myprojectのエージェントを起動
+
+注意:
+  - 事前にプロジェクトのセッションが作成されている必要があります
+  - 初回起動時はログインが必要な場合があります
+  - ログインが必要な場合は、案内に従って個別にセッションにアタッチしてください
+EOF
+}
+
+# 引数解析
+if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
+    show_help
+    exit 0
+fi
+
 # プロジェクト名を引数から取得
 PROJECT_NAME="$1"
 SESSION_PREFIX=""

@@ -79,14 +79,51 @@ show_help() {
 EOF
 }
 
+# listコマンドのヘルプ
+show_help_list() {
+    cat << EOF
+プロジェクト一覧表示コマンド
+
+使用方法:
+  $0 list [options]
+
+オプション:
+  --all                     すべてのプロジェクトを表示（実行中でないものも含む）
+  --help                    このヘルプを表示
+
+例:
+  $0 list                   # 実行中のプロジェクトのみ表示
+  $0 list --all             # すべてのプロジェクトを表示
+
+表示形式:
+  📂 project-name (🔴 実行中)    # セッションがアクティブ
+  📁 project-name (⚪ 停止中)    # セッションがない
+  📽️ デフォルト（プロジェクトなし）  # デフォルトセッション
+EOF
+}
+
 # listコマンド: プロジェクト一覧
 cmd_list() {
     local show_all=false
     
-    # --allオプションの確認
-    if [[ "$1" == "--all" ]]; then
-        show_all=true
-    fi
+    # 引数解析
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help|-h)
+                show_help_list
+                return 0
+                ;;
+            --all)
+                show_all=true
+                shift
+                ;;
+            *)
+                error "不明なオプション: $1"
+                echo "使用方法は $0 list --help を参照してください"
+                return 1
+                ;;
+        esac
+    done
     if [[ "$show_all" == true ]]; then
         info "全プロジェクト一覧:"
     else
@@ -192,8 +229,38 @@ cmd_list() {
     fi
 }
 
+# currentコマンドのヘルプ
+show_help_current() {
+    cat << EOF
+現在のプロジェクト表示コマンド
+
+使用方法:
+  $0 current [options]
+
+オプション:
+  --help                    このヘルプを表示
+
+説明:
+  現在設定されているプロジェクトコンテキストを表示します。
+  プロジェクトが設定されていない場合は「なし（デフォルト）」と表示されます。
+
+例:
+  $0 current                # 現在のプロジェクトを表示
+
+注意:
+  このコマンドはセッションの実行状態ではなく、
+  .current-projectファイルに保存されたコンテキストを表示します。
+EOF
+}
+
 # currentコマンド: 現在のプロジェクトを表示
 cmd_current() {
+    # ヘルプオプションチェック
+    if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+        show_help_current
+        return 0
+    fi
+    
     local current=$(get_current_project)
     if [ -n "$current" ]; then
         info "現在のプロジェクト: $current"
@@ -202,9 +269,41 @@ cmd_current() {
     fi
 }
 
+# switchコマンドのヘルプ
+show_help_switch() {
+    cat << EOF
+プロジェクト切り替えコマンド
+
+使用方法:
+  $0 switch <project-name>
+  $0 switch --clear
+
+引数:
+  project-name              切り替え先のプロジェクト名
+
+オプション:
+  --clear                   プロジェクトコンテキストをクリア
+  --help                    このヘルプを表示
+
+例:
+  $0 switch myproject       # myprojectに切り替え
+  $0 switch --clear         # デフォルトセッションに戻る
+
+説明:
+  現在のプロジェクトコンテキストを切り替えます。
+  セッションが実行中のプロジェクトにのみ切り替え可能です。
+  これにより、agent-sendやattachコマンドのデフォルト対象が変更されます。
+EOF
+}
+
 # switchコマンド: プロジェクト切り替え
 cmd_switch() {
     local project="$1"
+    
+    if [ "$project" = "--help" ] || [ "$project" = "-h" ]; then
+        show_help_switch
+        return 0
+    fi
     
     if [ "$project" = "--clear" ]; then
         rm -f .current-project
@@ -223,7 +322,7 @@ cmd_switch() {
     if ! tmux has-session -t "${project}-multiagent" 2>/dev/null && \
        ! tmux has-session -t "${project}-president" 2>/dev/null; then
         error "プロジェクト '$project' のセッションが見つかりません"
-        info "先に './bin/setup $project' でセッションを作成してください"
+        info "先に './bin/project start $project' でセッションを開始してください"
         return 1
     fi
     
@@ -239,9 +338,47 @@ cmd_switch() {
         echo "  - ${project}-president"
 }
 
+# attachコマンドのヘルプ
+show_help_attach() {
+    cat << EOF
+エージェントセッションへのアタッチコマンド
+
+使用方法:
+  $0 attach <agent-name>
+
+引数:
+  agent-name                アタッチ先のエージェント名
+
+利用可能なエージェント:
+  president                 プロジェクト統括責任者
+  boss1                     チームリーダー
+  worker1                   実行担当者A
+  worker2                   実行担当者B
+  worker3                   実行担当者C
+  multiagent                マルチエージェント全体（4分割画面）
+
+オプション:
+  --help                    このヘルプを表示
+
+例:
+  $0 attach president       # presidentセッションにアタッチ
+  $0 attach multiagent      # 全エージェントを4分割画面で表示
+
+説明:
+  現在のプロジェクト（またはデフォルト）のエージェントセッションにアタッチします。
+  tmux内から実行した場合はセッションを切り替え、そうでない場合はアタッチします。
+EOF
+}
+
 # attachコマンド: セッションアタッチ
 cmd_attach() {
     local agent="$1"
+    
+    if [ "$agent" = "--help" ] || [ "$agent" = "-h" ]; then
+        show_help_attach
+        return 0
+    fi
+    
     local prefix=$(get_project_prefix)
     local target=""
     
@@ -515,6 +652,35 @@ generate_project_instructions() {
     echo "📝 初回起動時にセットアップウィザードが実行されます"
 }
 
+# createコマンドのヘルプ
+show_help_create() {
+    cat << EOF
+プロジェクト作成コマンド
+
+使用方法:
+  $0 create <project-name> [options]
+
+引数:
+  project-name              新しいプロジェクト名（英数字、ハイフン、アンダースコアのみ）
+
+オプション:
+  --git                     Gitリポジトリを初期化
+  --remote URL              リモートリポジトリURLを設定
+  --workers N               Worker数を指定（デフォルト: 3、範囲: 1-20）
+  --help                    このヘルプを表示
+
+例:
+  $0 create myproject                    # 基本的なプロジェクト作成
+  $0 create myproject --git              # Git付きプロジェクト
+  $0 create myproject --workers 5        # 5人のworkerでプロジェクト作成
+  $0 create myproject --git --remote https://github.com/user/repo
+
+説明:
+  プロジェクトを作成し、自動的にtmuxセッションも起動します。
+  作成後は自動的にそのプロジェクトが現在のプロジェクトに設定されます。
+EOF
+}
+
 # createコマンド: プロジェクト作成（project-init + setup統合）
 cmd_create() {
     local project_name=""
@@ -526,6 +692,10 @@ cmd_create() {
     # 引数解析
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            --help|-h)
+                show_help_create
+                return 0
+                ;;
             --git)
                 init_git=true
                 shift
@@ -841,6 +1011,33 @@ EOF
     info "プロジェクトディレクトリ: projects/$project_name"
 }
 
+# startコマンドのヘルプ
+show_help_start() {
+    cat << EOF
+セッション開始コマンド
+
+使用方法:
+  $0 start [project-name] [options]
+
+引数:
+  project-name              セッションを開始するプロジェクト名
+                            （省略時はデフォルトセッション）
+
+オプション:
+  --workers N               Worker数を指定（デフォルト: 3、範囲: 1-20）
+  --help                    このヘルプを表示
+
+例:
+  $0 start                        # デフォルトセッションを開始
+  $0 start myproject              # myprojectのセッションを開始
+  $0 start myproject --workers 5  # 5人のworkerでセッション開始
+
+説明:
+  指定したプロジェクト（またはデフォルト）のtmuxセッションを開始します。
+  プロジェクトの場合、事前に'create'で作成されている必要があります。
+EOF
+}
+
 # startコマンド: セッション開始
 cmd_start() {
     local project_name=""
@@ -849,6 +1046,10 @@ cmd_start() {
     # 引数解析
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            --help|-h)
+                show_help_start
+                return 0
+                ;;
             --workers)
                 if [[ -z "$2" ]] || ! [[ "$2" =~ ^[0-9]+$ ]]; then
                     error "--workersオプションには数値が必要です"
@@ -942,10 +1143,51 @@ cmd_start() {
     echo "  ./bin/project attach multiagent     # 4分割画面で全エージェントを表示"
 }
 
+# deleteコマンドのヘルプ
+show_help_delete() {
+    cat << EOF
+プロジェクト削除コマンド
+
+使用方法:
+  $0 delete <project-name>
+  $0 delete --current
+
+引数:
+  project-name              削除するプロジェクト名
+
+オプション:
+  --current                 現在のプロジェクトを削除
+  --help                    このヘルプを表示
+
+例:
+  $0 delete myproject       # myprojectを完全に削除
+  $0 delete --current       # 現在のプロジェクトを削除
+
+警告:
+  この操作は取り消しできません！
+  以下が完全に削除されます：
+  - すべてのソースコード
+  - すべてのドキュメント
+  - すべてのGit履歴
+  - 実行中のセッション
+
+説明:
+  プロジェクトを完全に削除します。
+  削除前に2段階の確認が必要です：
+  1. "yes"の入力
+  2. プロジェクト名の再入力
+EOF
+}
+
 # deleteコマンド: プロジェクト削除
 cmd_delete() {
     local arg="$1"
     local project=""
+    
+    if [ "$arg" = "--help" ] || [ "$arg" = "-h" ]; then
+        show_help_delete
+        return 0
+    fi
     
     # 削除確認関数（強化版）
     confirm_delete() {
@@ -1071,9 +1313,43 @@ cmd_delete() {
     success "プロジェクト '$project' を完全に削除しました"
 }
 
+# stopコマンドのヘルプ
+show_help_stop() {
+    cat << EOF
+セッション停止コマンド
+
+使用方法:
+  $0 stop [project-name]
+  $0 stop --current
+  $0 stop --all
+
+引数:
+  project-name              停止するプロジェクト名
+
+オプション:
+  --current                 現在のプロジェクトを停止
+  --all                     すべてのプロジェクトを停止
+  --help                    このヘルプを表示
+
+例:
+  $0 stop myproject         # myprojectのセッションを停止
+  $0 stop --current         # 現在のプロジェクトを停止
+  $0 stop --all             # すべてのセッションを停止
+
+説明:
+  指定されたプロジェクトのtmuxセッションを停止します。
+  停止前に確認プロンプトが表示されます。
+EOF
+}
+
 # stopコマンド: セッション停止
 cmd_stop() {
     local arg="$1"
+    
+    if [ "$arg" = "--help" ] || [ "$arg" = "-h" ]; then
+        show_help_stop
+        return 0
+    fi
     
     # 停止確認関数
     confirm_stop() {
@@ -1194,7 +1470,7 @@ main() {
             cmd_list "$@"
             ;;
         current)
-            cmd_current
+            cmd_current "$@"
             ;;
         switch)
             cmd_switch "$@"
