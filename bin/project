@@ -53,13 +53,13 @@ show_help() {
   current                   現在のプロジェクトを表示
   switch <project-name>     プロジェクトを切り替え
   switch --clear            プロジェクトコンテキストをクリア
+  delete <project-name>     プロジェクトを完全に削除（データも削除）
+  delete --current          現在のプロジェクトを削除
   attach <agent-name>       エージェントのセッションにアタッチ
     agent-name: president, boss1, worker1-3, multiagent
   stop [project-name]       プロジェクトのセッションを停止
   stop --current            現在のプロジェクトを停止
   stop --all                全プロジェクトを停止
-  delete <project-name>     プロジェクトを完全に削除（データも削除）
-  delete --current          現在のプロジェクトを削除
 
   === その他 ===
   help                      このヘルプを表示
