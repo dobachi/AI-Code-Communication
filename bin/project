@@ -559,7 +559,7 @@ create_multiagent_session() {
         fi
         
         local title="${pane_titles[$i]}"
-        tmux select-pane -t "${multiagent_session}:0.$i" -T "$title"
+        tmux select-pane -t "${multiagent_session}:0.$i" -T "$title" 2>/dev/null || true
         tmux send-keys -t "${multiagent_session}:0.$i" "cd $(pwd)" C-m
         
         if [[ $i -eq 0 ]]; then
@@ -575,6 +575,12 @@ create_multiagent_session() {
     
     # レイアウトを均等に調整
     tmux select-layout -t "${multiagent_session}:0" tiled
+    
+    # presidentセッション作成
+    tmux new-session -d -s "$president_session"
+    tmux send-keys -t "$president_session" "cd $(pwd)" C-m
+    tmux send-keys -t "$president_session" "export PS1='(\[\033[1;35m\]PRESIDENT\[\033[0m\]) \[\033[1;32m\]\w\[\033[0m\]\$ '" C-m
+    tmux send-keys -t "$president_session" "echo '=== PRESIDENT セッション ==='" C-m
 }
 
 # テンプレートディレクトリの初期化
@@ -1081,12 +1087,6 @@ EOF
     # tmuxセッション作成処理を関数として実装
     create_multiagent_session "$project_name" "$worker_count"
     
-    # presidentセッション作成
-    tmux new-session -d -s "$president_session"
-    tmux send-keys -t "$president_session" "cd $(pwd)" C-m
-    tmux send-keys -t "$president_session" "export PS1='(\[\033[1;35m\]PRESIDENT\[\033[0m\]) \[\033[1;32m\]\w\[\033[0m\]\$ '" C-m
-    tmux send-keys -t "$president_session" "echo '=== PRESIDENT セッション ==='" C-m
-    
     success "エージェントセッションを作成しました"
     
     # Step 3: プロジェクトに自動切り替え
@@ -1203,13 +1203,6 @@ cmd_start() {
         # セッション作成
         create_multiagent_session "$project_name" "$worker_count"
         
-        # presidentセッション作成
-        local president_session="${project_name}-president"
-        tmux new-session -d -s "$president_session"
-        tmux send-keys -t "$president_session" "cd $(pwd)" C-m
-        tmux send-keys -t "$president_session" "export PS1='(\[\033[1;35m\]PRESIDENT\[\033[0m\]) \[\033[1;32m\]\w\[\033[0m\]\$ '" C-m
-        tmux send-keys -t "$president_session" "echo '=== PRESIDENT セッション ==='" C-m
-        
         success "プロジェクト '$project_name' のセッションを開始しました"
     else
         # デフォルトセッション
@@ -1221,12 +1214,6 @@ cmd_start() {
         
         # セッション作成
         create_multiagent_session "" "$worker_count"
-        
-        # presidentセッション作成
-        tmux new-session -d -s "president"
-        tmux send-keys -t "president" "cd $(pwd)" C-m
-        tmux send-keys -t "president" "export PS1='(\[\033[1;35m\]PRESIDENT\[\033[0m\]) \[\033[1;32m\]\w\[\033[0m\]\$ '" C-m
-        tmux send-keys -t "president" "echo '=== PRESIDENT セッション ==='" C-m
         
         success "デフォルトセッションを開始しました"
     fi
