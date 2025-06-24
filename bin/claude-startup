@@ -1,14 +1,14 @@
 #!/bin/bash
 
-# Claude Code 段階的起動スクリプト（ログイン対応版）
-# Usage: ./bin/claude-startup [project-name]
+# Claude Code 高速起動スクリプト
+# Usage: ./bin/claude-startup-fast [project-name]
 
 set -e
 
 # ヘルプメッセージ
 show_help() {
     cat << EOF
-Claude Code エージェント起動スクリプト
+Claude Code エージェント高速起動スクリプト
 
 使用方法:
   $0 [project-name] [options]
@@ -20,42 +20,53 @@ Claude Code エージェント起動スクリプト
 
 オプション:
   -h, --help                このヘルプを表示
+  -c, --check               起動後にログイン状態を確認（遅くなります）
 
 説明:
-  指定されたプロジェクト（またはデフォルトプロジェクト）のClaude Codeエージェントを
-  段階的に起動します。
-
-  1. Presidentセッションでclaude --dangerously-skip-permissionsを実行
-  2. Multiagentセッション（boss1, worker1-3）で同コマンドを実行
-  3. 各セッションのログイン状態を確認
-  4. 必要に応じてログインのガイダンスを表示
+  全エージェントを並列で高速起動します。
+  デフォルトでは起動コマンドを送信するだけで、ログイン確認は行いません。
+  
+  起動時間: 約2-3秒（従来版: 約17-25秒）
 
 例:
-  $0                        # 現在のプロジェクトでエージェント起動
-  $0 myproject              # myprojectのエージェントを起動
+  $0                        # 現在のプロジェクトで高速起動
+  $0 myproject              # myprojectを高速起動
+  $0 -c                     # 起動後にログイン状態を確認
 
 注意:
-  - 事前にプロジェクトのセッションが作成されている必要があります
-  - 初回起動時はログインが必要な場合があります
-  - ログインが必要な場合は、案内に従って個別にセッションにアタッチしてください
+  - ログイン状態の確認が必要な場合は -c オプションを使用してください
+  - 初回起動時は個別にセッションにアタッチしてログインが必要です
 EOF
 }
 
 # 引数解析
-if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
-    show_help
-    exit 0
-fi
+CHECK_LOGIN=false
+PROJECT_NAME=""
 
-# プロジェクト名を引数から取得
-PROJECT_NAME="$1"
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -c|--check)
+            CHECK_LOGIN=true
+            shift
+            ;;
+        *)
+            if [[ -z "$PROJECT_NAME" ]]; then
+                PROJECT_NAME="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+# セッションプレフィックスの設定
 SESSION_PREFIX=""
-
-# プロジェクト名が指定された場合はプレフィックスを設定
 if [ -n "$PROJECT_NAME" ]; then
     SESSION_PREFIX="${PROJECT_NAME}-"
 elif [ -f ".current-project" ]; then
-    # .current-projectファイルからプロジェクト名を読み込み
     PROJECT_NAME=$(cat .current-project)
     SESSION_PREFIX="${PROJECT_NAME}-"
 fi
@@ -70,98 +81,132 @@ success() { echo -e "\e[32m[SUCCESS]\e[0m $1"; }
 warning() { echo -e "\e[33m[WARNING]\e[0m $1"; }
 error() { echo -e "\e[31m[ERROR]\e[0m $1"; }
 
-# ログイン状態チェック関数
-check_login_status() {
-    local session_name=$1
-    local timeout=30
-    local count=0
+# 高速ログイン状態チェック（並列実行）
+fast_check_login_status() {
+    local pids=()
+    local sessions=()
+    local results_dir=$(mktemp -d)
     
-    info "セッション $session_name のログイン状態をチェック中..."
+    info "全セッションのログイン状態を並列チェック中..."
     
-    while [ $count -lt $timeout ]; do
-        # tmuxセッションから出力を取得
-        local output=$(tmux capture-pane -t $session_name -p 2>/dev/null || echo "")
-        
-        if echo "$output" | grep -q "Claude Code"; then
-            success "セッション $session_name: ログイン成功"
-            return 0
-        elif echo "$output" | grep -q -i "login\|email\|password"; then
-            warning "セッション $session_name: ログインが必要です"
-            return 1
-        fi
-        
-        sleep 1
-        count=$((count + 1))
+    # 各セッションのチェックをバックグラウンドで実行
+    for session in "$PRESIDENT_SESSION" \
+                   "${MULTIAGENT_SESSION}:0.0" \
+                   "${MULTIAGENT_SESSION}:0.1" \
+                   "${MULTIAGENT_SESSION}:0.2" \
+                   "${MULTIAGENT_SESSION}:0.3"; do
+        (
+            local output=$(tmux capture-pane -t $session -p 2>/dev/null || echo "")
+            if echo "$output" | grep -q "Claude Code"; then
+                echo "OK" > "$results_dir/$session"
+            elif echo "$output" | grep -q -i "login\|email\|password"; then
+                echo "LOGIN_REQUIRED" > "$results_dir/$session"
+            else
+                echo "UNKNOWN" > "$results_dir/$session"
+            fi
+        ) &
+        pids+=($!)
+        sessions+=("$session")
     done
     
-    warning "セッション $session_name: ログイン状態の確認がタイムアウトしました"
-    return 2
-}
-
-# 対話的ログイン支援
-assist_login() {
-    local session_name=$1
+    # 全チェックの完了を待つ（最大5秒）
+    local timeout=5
+    local elapsed=0
+    while [ $elapsed -lt $timeout ]; do
+        local all_done=true
+        for pid in "${pids[@]}"; do
+            if kill -0 $pid 2>/dev/null; then
+                all_done=false
+                break
+            fi
+        done
+        
+        if $all_done; then
+            break
+        fi
+        
+        sleep 0.5
+        elapsed=$((elapsed + 1))
+    done
     
-    warning "セッション $session_name でログインが必要です"
-    echo "以下の手順でログインしてください："
-    echo "1. tmux attach -t $session_name"
-    echo "2. メールアドレスとパスワードを入力"
-    echo "3. ログイン完了後、Ctrl+B→D でデタッチ"
+    # 結果の表示
+    local login_required=false
+    for i in "${!sessions[@]}"; do
+        local session="${sessions[$i]}"
+        local result_file="$results_dir/$session"
+        
+        if [ -f "$result_file" ]; then
+            local status=$(cat "$result_file")
+            case $status in
+                OK)
+                    success "  $session: ログイン済み"
+                    ;;
+                LOGIN_REQUIRED)
+                    warning "  $session: ログインが必要です"
+                    login_required=true
+                    ;;
+                *)
+                    warning "  $session: 状態不明"
+                    ;;
+            esac
+        else
+            warning "  $session: チェックタイムアウト"
+        fi
+    done
     
-    read -p "ログインが完了したら Enter を押してください... " -r
+    # クリーンアップ
+    rm -rf "$results_dir"
     
-    if check_login_status $session_name; then
-        return 0
-    else
-        error "ログインが完了していないようです"
-        return 1
+    if $login_required; then
+        echo ""
+        warning "ログインが必要なセッションがあります。個別に接続してログインしてください。"
     fi
 }
 
-info "🚀 Claude Code段階的起動を開始します..."
+# 開始時刻を記録
+START_TIME=$(date +%s.%N)
+
+info "🚀 Claude Code高速起動を開始します..."
 if [ -n "$PROJECT_NAME" ]; then
     info "📁 プロジェクト: $PROJECT_NAME"
 fi
 
-# 手順1: President認証
-info "📋 Step 1: President認証を開始..."
-tmux send-keys -t "$PRESIDENT_SESSION" 'claude --dangerously-skip-permissions' C-m
+# 全セッションに並列でコマンドを送信
+info "⚡ 全エージェントに起動コマンドを送信中..."
 
-# President認証状態確認
-sleep 5
-if ! check_login_status "$PRESIDENT_SESSION"; then
-    if ! assist_login "$PRESIDENT_SESSION"; then
-        error "President認証に失敗しました"
-        exit 1
-    fi
-fi
+# President
+tmux send-keys -t "$PRESIDENT_SESSION" 'claude --dangerously-skip-permissions' C-m &
 
-success "President認証完了"
-
-# 手順2: Multiagent一括起動
-info "🤖 Step 2: Multiagent一括起動を開始..."
-
+# Multiagent（boss1, worker1-3）
 for i in {0..3}; do
-    session="${MULTIAGENT_SESSION}:0.$i"
-    info "  Starting $session..."
-    tmux send-keys -t $session 'claude --dangerously-skip-permissions' C-m
-    
-    sleep 3
-    
-    # ログイン状態確認
-    if ! check_login_status $session; then
-        warning "$session でログインが必要な可能性があります"
-        echo "必要に応じて手動でログインしてください: tmux attach -t $session"
-    fi
+    tmux send-keys -t "${MULTIAGENT_SESSION}:0.$i" 'claude --dangerously-skip-permissions' C-m &
 done
 
-success "✅ Claude Code一括起動完了！"
+# コマンド送信の完了を待つ（非常に短時間）
+wait
+
+# 起動時間を計算
+END_TIME=$(date +%s.%N)
+ELAPSED=$(echo "$END_TIME - $START_TIME" | bc)
+
+success "✅ 起動コマンド送信完了！（所要時間: ${ELAPSED}秒）"
+
+# ログイン状態の確認（オプション）
+if $CHECK_LOGIN; then
+    echo ""
+    sleep 2  # 起動処理が始まるまで少し待つ
+    fast_check_login_status
+fi
+
 echo ""
-info "📝 セッション確認："
+info "📝 セッション一覧:"
 echo "  President: tmux attach -t $PRESIDENT_SESSION"
 echo "  Boss1:     tmux attach -t ${MULTIAGENT_SESSION}:0.0"
 echo "  Worker1:   tmux attach -t ${MULTIAGENT_SESSION}:0.1"
 echo "  Worker2:   tmux attach -t ${MULTIAGENT_SESSION}:0.2"
 echo "  Worker3:   tmux attach -t ${MULTIAGENT_SESSION}:0.3"
-echo ""
-info "🔧 ログインが必要なセッションがある場合は、上記コマンドで個別に接続してください"
+
+if ! $CHECK_LOGIN; then
+    echo ""
+    info "💡 ヒント: ログイン状態を確認するには -c オプションを使用してください"
+fi
