@@ -1,4 +1,4 @@
-# 🤖 Claude Code エージェント通信システム
+# 🤖 AI-Code-Communication エージェント通信システム
 
 複数のAIが協力して働く、まるで会社のような開発システムです
 
@@ -33,7 +33,7 @@
 
 ```bash
 # このリポジトリをクローン
-git clone https://github.com/your-username/Claude-Code-Communication.git
+git clone https://github.com/your-username/AI-Code-Communication.git
 
 # ディレクトリに移動
 cd Claude-Code-Communication
