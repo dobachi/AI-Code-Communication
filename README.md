@@ -18,75 +18,86 @@
 - 12個の革新的アイデアを生成
 - 100%のテストカバレッジ
 
-## 🎬 5分で動かしてみよう！
+## 🚀 セットアップとプロジェクト開始
+
+このシステムは、**プロジェクト管理用のリポジトリ**の中に、**開発対象のソースコードを独立したリポジトリ**として配置する構成を推奨しています。
 
 ### 必要なもの
 - Mac または Linux
 - tmux（ターミナル分割ツール）
 - Claude Code CLI
 
-### 手順
+### 1. プロジェクト管理コンテナの準備 (初回のみ)
 
-#### 1️⃣ ダウンロード（30秒）
+まず、このエージェントシステム自体をダウンロードします。
+
 ```bash
-git clone https://github.com/nishimoto265/Claude-Code-Communication.git
+# このリポジトリをクローン
+git clone https://github.com/your-username/Claude-Code-Communication.git
+
+# ディレクトリに移動
 cd Claude-Code-Communication
 ```
 
-#### 2️⃣ 環境構築（30秒）
+### 2. 新規プロジェクトの開始方法
 
-**最速で始める（推奨）：**
+新しい開発プロジェクトを始めるときの典型的な流れです。
+
+#### ステップ1: プロジェクト管理環境の作成
+
+`./bin/project create` コマンドで、新しいプロジェクトのための管理環境（ディレクトリ構造、tmuxセッションなど）を作成します。
+
 ```bash
-./bin/quick-start myproject      # プロジェクト作成→AI起動まで全自動！
+# "sample-agent-project" という名前の管理環境を作成
+./bin/project create sample-agent-project
 ```
 
-**個別に実行する場合：**
+#### ステップ2: 開発対象リポジトリのクローン
+
+次に、実際に開発したいアプリケーションのソースコードを、所定の場所にクローンします。
+
+1.  **President用のディレクトリに移動**
+    Presidentはメインブランチを管理します。
+    ```bash
+    cd projects/sample-agent-project/workspace/president
+    ```
+
+2.  **開発対象リポジトリをクローン**
+    ここに、開発したいリポジトリを `source` という名前でクローンするのが推奨です。
+    ```bash
+    # "sample-application-code.git" をクローン
+    git clone git@github.com:your-username/sample-application-code.git source
+    ```
+    *   **Note:** `source` ディレクトリは `.gitignore` で管理対象外に設定されています。
+
+#### ステップ3: エージェントの起動
+
+管理環境名（`sample-agent-project`）を指定して、AIエージェントたちを起動します。
+
 ```bash
-# デフォルトプロジェクト（プロジェクト名なし）の場合
-./bin/project setup
-
-# 新規プロジェクトを作成する場合
-./bin/project create myproject    # プロジェクト作成＆環境構築
-```
-これで4つのターミナル画面が自動で作られます！
-
-**複数プロジェクトを並行実行する場合：**
-```bash
-# プロジェクト作成（ディレクトリ構造＋tmuxセッション）
-./bin/project create project1
-./bin/project create project2 --git    # Git管理付き
-
-# プロジェクト切り替え
-./bin/project switch project1
-./bin/project list    # 実行中のプロジェクト一覧
+# 必ずプロジェクト名を指定して起動
+./bin/claude-startup sample-agent-project
 ```
 
-#### 3️⃣ AIを自動起動（1分）
+#### ステップ4: 作業開始の指示
 
-**一括起動スクリプトを実行：**
-```bash
-./bin/claude-startup
+Presidentのターミナルで、最初の指示を与えます。
+
+```
+あなたはpresidentです。指示書に従って、プロジェクトを開始してください。
 ```
 
-このスクリプトが自動で：
-- 社長（PRESIDENT）の認証
-- 部下たち（boss1, worker1-3）の起動
-- ログイン状態の確認
+これで、設定された開発環境でエージェントたちが自律的に作業を開始します。
 
-を行います！
+### 補足: Git Worktreeによる並行作業
 
-#### 4️⃣ 魔法の言葉を入力（30秒）
+このシステムは `git worktree` を活用し、`boss` や `worker` たちが同じリポジトリで安全に並行作業できる環境を自動で構築します。
 
-社長（PRESIDENT）の画面で：
-```
-あなたはpresidentです。指示書に従って
-```
+-   `workspace/president`: `main` ブランチを担当
+-   `workspace/boss1`: `boss1` ブランチで作業
+-   `workspace/worker1`: `worker1` ブランチで作業
 
-**すると自動的に：**
-1. 社長がマネージャーに指示
-2. マネージャーが3人の作業者に仕事を割り振り
-3. みんなで協力して開発
-4. 完成したら社長に報告
+これにより、各エージェントは他の作業者の変更に影響されることなく、独立してタスクを進めることができます。
 
 ## 🏢 登場人物（エージェント）
 
