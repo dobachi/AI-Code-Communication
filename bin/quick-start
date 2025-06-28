@@ -28,10 +28,12 @@ show_help() {
   --workers N                     Worker数を指定（デフォルト: 3）
   --default                       デフォルトセッション（プロジェクトなし）を使用
   --no-start                      AI起動をスキップ（セッション作成のみ）
+  --ai <type>                     起動するAIの種類 (claude, gemini) (デフォルト: claude)
   -h, --help                      このヘルプを表示
 
 使用例:
-  $0 myproject                    # プロジェクト作成→AI起動
+  $0 myproject                    # プロジェクト作成→AI起動 (Claude)
+  $0 myproject --ai gemini        # プロジェクト作成→AI起動 (Gemini)
   $0 myproject --git              # Git付きプロジェクト作成→AI起動
   $0 myproject --workers 5        # 5人のworkerでプロジェクト作成
   $0 --default                    # デフォルトセッション→AI起動
@@ -40,7 +42,7 @@ show_help() {
 
 このスクリプトは以下を自動実行します:
   1. プロジェクト作成（またはデフォルトセッション作成）
-  2. Claude Codeエージェント起動
+  2. AIエージェント起動
   3. アタッチ方法の案内表示
 EOF
 }
@@ -49,6 +51,7 @@ EOF
 PROJECT_NAME=""
 USE_DEFAULT=false
 NO_START=false
+AI_TYPE="claude" # デフォルトはClaude
 GIT_ARGS=()
 START_ARGS=()
 
@@ -62,6 +65,18 @@ while [[ $# -gt 0 ]]; do
         --no-start)
             NO_START=true
             shift
+            ;;
+        --ai)
+            if [[ -z "$2" ]]; then
+                error "--aiオプションにはAIの種類が必要です (claude, gemini)"
+                exit 1
+            fi
+            if [[ "$2" != "claude" ]] && [[ "$2" != "gemini" ]]; then
+                error "無効なAIの種類: $2. 'claude' または 'gemini' を指定してください。"
+                exit 1
+            fi
+            AI_TYPE="$2"
+            shift 2
             ;;
         --git)
             GIT_ARGS+=("--git")
@@ -80,8 +95,8 @@ while [[ $# -gt 0 ]]; do
                 error "--workersオプションには数値が必要です"
                 exit 1
             fi
-            GIT_ARGS+=("--workers" "$2")
-            START_ARGS+=("--workers" "$2")
+            START_ARGS+=("--workers" "$2") # project create/start に渡す
+            GIT_ARGS+=("--workers" "$2") # project create に渡す
             shift 2
             ;;
         -h|--help)
@@ -140,10 +155,17 @@ echo ""
 
 # Step 2: AI起動（オプション）
 if [[ "$NO_START" == false ]]; then
-    info "Claude Codeエージェントを起動中..."
-    if ! ./bin/claude-startup; then
-        error "AI起動に失敗しました"
-        exit 1
+    info "${AI_TYPE^} エージェントを起動中..." # ${AI_TYPE^} で先頭を大文字に
+    if [[ "$AI_TYPE" == "claude" ]]; then
+        if ! ./bin/claude-startup; then
+            error "Claude AI起動に失敗しました"
+            exit 1
+        fi
+    elif [[ "$AI_TYPE" == "gemini" ]]; then
+        if ! ./bin/gemini-startup; then
+            error "Gemini AI起動に失敗しました"
+            exit 1
+        fi
     fi
     
     echo ""
@@ -159,7 +181,7 @@ if [[ "$NO_START" == false ]]; then
 else
     echo ""
     success "✅ セッション作成が完了しました"
-    info "AIを起動するには: ./bin/claude-startup"
+    info "AIを起動するには: ./bin/${AI_TYPE}-startup"
 fi
 
 # プロジェクト切り替えの案内
