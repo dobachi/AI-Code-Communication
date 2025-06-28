@@ -36,7 +36,7 @@
 git clone https://github.com/your-username/AI-Code-Communication.git
 
 # ディレクトリに移動
-cd Claude-Code-Communication
+cd AI-Code-Communication
 ```
 
 ### 2. 新規プロジェクトの開始方法
@@ -528,6 +528,6 @@ sleep 300
 
 ---
 
-**作者**: [GitHub](https://github.com/nishimoto265/Claude-Code-Communication)
+**作者**: [GitHub](https://github.com/dobachi/AI-Code-Communication)
 **ライセンス**: MIT
-**質問**: [Issues](https://github.com/nishimoto265/Claude-Code-Communication/issues)へどうぞ！
+**質問**: [Issues](https://github.com/dobachi/AI-Code-Communication/issues)へどうぞ！

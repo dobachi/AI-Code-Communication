@@ -1,13 +1,12 @@
 # Bin Directory
 
-Executable commands for Claude Code Communication project.
+Executable commands for AI-Code-Communication project.
 
 ## Commands
 
 - **agent-send**: Send messages between team agents
-- **setup**: Initial project setup (tmux sessions)
-- **claude-startup**: Automated Claude Code startup with login management
-- **project-init**: Create new empty project with standard structure
+- **claude-startup**: Automated Claude AI startup with login management
+- **gemini-startup**: Automated Gemini AI startup with login management
 - **instructions-select**: Switch between instruction modes (challenge/stable/iterative)
 
 ## Usage
@@ -22,7 +21,7 @@ Or run directly:
 
 ```bash
 ./bin/agent-send boss1 "Hello"
-./bin/setup
-./bin/claude-startup
+./bin/project create myproject
+./bin/claude-startup myproject # または ./bin/gemini-startup myproject
 ./bin/instructions-select challenge
 ```

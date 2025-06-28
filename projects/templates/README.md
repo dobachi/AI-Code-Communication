@@ -5,7 +5,7 @@
 ## 階層的指示書構造
 
 ```
-Claude-Code-Communication/
+AI-Code-Communication/
 ├── instructions/              # システム全体の指示書
 │   ├── challenge/            # 創造的モード
 │   ├── stable/              # 安定モード

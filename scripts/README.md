@@ -1,6 +1,6 @@
 # Scripts Directory
 
-Development and maintenance scripts for Claude Code Communication project.
+Development and maintenance scripts for AI-Code-Communication project.
 
 ## Scripts
 
