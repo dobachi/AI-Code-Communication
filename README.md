@@ -25,7 +25,7 @@
 ### 必要なもの
 - Mac または Linux
 - tmux（ターミナル分割ツール）
-- Claude Code CLI
+- AI CLI (Claude または Gemini)
 
 ### 1. プロジェクト管理コンテナの準備 (初回のみ)
 
@@ -75,8 +75,11 @@ cd Claude-Code-Communication
 管理環境名（`sample-agent-project`）を指定して、AIエージェントたちを起動します。
 
 ```bash
-# 必ずプロジェクト名を指定して起動
+# Claude エージェントを起動する場合
 ./bin/claude-startup sample-agent-project
+
+# Gemini エージェントを起動する場合
+./bin/gemini-startup sample-agent-project
 ```
 
 #### ステップ4: 作業開始の指示
@@ -170,6 +173,7 @@ UIデザインの革新的アイデアを3つ以上提案してください。
 - **project**: 統合プロジェクト管理（作成・セットアップ・切替・停止など）
 - **agent-send**: エージェント間メッセージ送信
 - **claude-startup**: Claude Codeエージェントの一括起動
+- **gemini-startup**: Gemini Codeエージェントの一括起動
 
 ### 指示書（instructions/）
 各エージェントの行動マニュアルです
@@ -258,7 +262,7 @@ emotiflow-mvp/
 ./bin/project current
 
 # AIを再起動
-./bin/claude-startup
+./bin/claude-startup # または ./bin/gemini-startup
 ```
 
 ### Q: メッセージが届かない
@@ -308,11 +312,11 @@ rm -rf ./tmp/*
 ```bash
 # プロジェクト1を開始
 ./bin/project create project1   # プロジェクト作成＆環境構築
-./bin/claude-startup            # AIエージェント起動
+./bin/claude-startup            # AIエージェント起動 (または ./bin/gemini-startup)
 
 # プロジェクト2を開始（project1は動いたまま）
 ./bin/project create project2   # 別のプロジェクトを作成
-./bin/claude-startup            # project2のAIエージェント起動
+./bin/claude-startup            # project2のAIエージェント起動 (または ./bin/gemini-startup)
 
 # 統合プロジェクト管理コマンドを使用
 ./bin/project list              # 実行中のプロジェクト一覧
