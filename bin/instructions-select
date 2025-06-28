@@ -15,12 +15,12 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 INSTRUCTIONS_DIR="$PROJECT_ROOT/instructions"
-CLAUDE_MD_PATH="$PROJECT_ROOT/CLAUDE.md"
+INSTRUCTION_MD_FILES=("$PROJECT_ROOT/CLAUDE.md" "$PROJECT_ROOT/GEMINI.md") # 複数の指示書ファイルに対応
 
 # Help function
 show_help() {
     cat << EOF
-🔧 Claude Code Communication - Instructions Selector
+🔧 AI-Code-Communication - Instructions Selector
 
 USAGE:
     ./bin/instructions-select <mode> [options]
@@ -40,18 +40,19 @@ EXAMPLES:
     ./bin/instructions-select iterative
     ./bin/instructions-select status
 
-The script will update CLAUDE.md to reference the selected instruction set.
+The script will update instruction references in CLAUDE.md and GEMINI.md.
 EOF
 }
 
-# Check current instruction mode
-check_current_mode() {
-    if [[ -f "$CLAUDE_MD_PATH" ]]; then
-        if grep -q "@instructions/challenge/" "$CLAUDE_MD_PATH" 2>/dev/null; then
+# Check current instruction mode for a given file
+check_file_mode() {
+    local file_path="$1"
+    if [[ -f "$file_path" ]]; then
+        if grep -q "@instructions/challenge/" "$file_path" 2>/dev/null; then
             echo "challenge"
-        elif grep -q "@instructions/stable/" "$CLAUDE_MD_PATH" 2>/dev/null; then
+        elif grep -q "@instructions/stable/" "$file_path" 2>/dev/null; then
             echo "stable"
-        elif grep -q "@instructions/iterative/" "$CLAUDE_MD_PATH" 2>/dev/null; then
+        elif grep -q "@instructions/iterative/" "$file_path" 2>/dev/null; then
             echo "iterative"
         else
             echo "unknown"
@@ -61,77 +62,82 @@ check_current_mode() {
     fi
 }
 
-# Update CLAUDE.md with selected instruction mode
-update_claude_md() {
+# Update instruction MD files with selected instruction mode
+update_instruction_md_files() {
     local mode="$1"
+    local all_files_updated=true
+
+    for md_file in "${INSTRUCTION_MD_FILES[@]}"; do
+        if [[ ! -f "$md_file" ]]; then
+            echo -e "${RED}Error: Instruction file not found at $md_file${NC}" >&2
+            all_files_updated=false
+            continue
+        fi
+        
+        # Create backup
+        local backup_dir="$PROJECT_ROOT/backups/$(basename "$md_file" .md)-md"
+        mkdir -p "$backup_dir"
+        cp "$md_file" "$backup_dir/$(basename "$md_file").backup.$(date +%Y%m%d_%H%M%S)"
+        
+        # Update instruction references
+        case "$mode" in
+            challenge)
+                sed -i 's|@instructions/stable/|@instructions/challenge/|g' "$md_file"
+                sed -i 's|@instructions/iterative/|@instructions/challenge/|g' "$md_file"
+                sed -i 's|@instructions/president\.md|@instructions/challenge/president.md|g' "$md_file"
+                sed -i 's|@instructions/boss\.md|@instructions/challenge/boss.md|g' "$md_file"
+                sed -i 's|@instructions/worker\.md|@instructions/challenge/worker.md|g' "$md_file"
+                ;;
+            stable)
+                sed -i 's|@instructions/challenge/|@instructions/stable/|g' "$md_file"
+                sed -i 's|@instructions/iterative/|@instructions/stable/|g' "$md_file"
+                sed -i 's|@instructions/president\.md|@instructions/stable/president.md|g' "$md_file"
+                sed -i 's|@instructions/boss\.md|@instructions/stable/boss.md|g' "$md_file"
+                sed -i 's|@instructions/worker\.md|@instructions/stable/worker.md|g' "$md_file"
+                ;;
+            iterative)
+                sed -i 's|@instructions/challenge/|@instructions/iterative/|g' "$md_file"
+                sed -i 's|@instructions/stable/|@instructions/iterative/|g' "$md_file"
+                sed -i 's|@instructions/president\.md|@instructions/iterative/president.md|g' "$md_file"
+                sed -i 's|@instructions/boss\.md|@instructions/iterative/boss.md|g' "$md_file"
+                sed -i 's|@instructions/worker\.md|@instructions/iterative/worker.md|g' "$md_file"
+                ;;
+        esac
+        echo -e "  ${GREEN}✅ Updated $(basename "$md_file")${NC}"
+    done
     
-    if [[ ! -f "$CLAUDE_MD_PATH" ]]; then
-        echo -e "${RED}Error: CLAUDE.md not found at $CLAUDE_MD_PATH${NC}" >&2
-        exit 1
+    if [[ "$all_files_updated" == false ]]; then
+        return 1 # 一部ファイルが更新できなかった場合
     fi
-    
-    # Create backup
-    mkdir -p "$PROJECT_ROOT/backups/claude-md"
-    cp "$CLAUDE_MD_PATH" "$PROJECT_ROOT/backups/claude-md/CLAUDE.md.backup.$(date +%Y%m%d_%H%M%S)"
-    
-    # Update instruction references
-    case "$mode" in
-        challenge)
-            sed -i 's|@instructions/stable/|@instructions/challenge/|g' "$CLAUDE_MD_PATH"
-            sed -i 's|@instructions/iterative/|@instructions/challenge/|g' "$CLAUDE_MD_PATH"
-            sed -i 's|@instructions/president\.md|@instructions/challenge/president.md|g' "$CLAUDE_MD_PATH"
-            sed -i 's|@instructions/boss\.md|@instructions/challenge/boss.md|g' "$CLAUDE_MD_PATH"
-            sed -i 's|@instructions/worker\.md|@instructions/challenge/worker.md|g' "$CLAUDE_MD_PATH"
-            ;;
-        stable)
-            sed -i 's|@instructions/challenge/|@instructions/stable/|g' "$CLAUDE_MD_PATH"
-            sed -i 's|@instructions/iterative/|@instructions/stable/|g' "$CLAUDE_MD_PATH"
-            sed -i 's|@instructions/president\.md|@instructions/stable/president.md|g' "$CLAUDE_MD_PATH"
-            sed -i 's|@instructions/boss\.md|@instructions/stable/boss.md|g' "$CLAUDE_MD_PATH"
-            sed -i 's|@instructions/worker\.md|@instructions/stable/worker.md|g' "$CLAUDE_MD_PATH"
-            ;;
-        iterative)
-            sed -i 's|@instructions/challenge/|@instructions/iterative/|g' "$CLAUDE_MD_PATH"
-            sed -i 's|@instructions/stable/|@instructions/iterative/|g' "$CLAUDE_MD_PATH"
-            sed -i 's|@instructions/president\.md|@instructions/iterative/president.md|g' "$CLAUDE_MD_PATH"
-            sed -i 's|@instructions/boss\.md|@instructions/iterative/boss.md|g' "$CLAUDE_MD_PATH"
-            sed -i 's|@instructions/worker\.md|@instructions/iterative/worker.md|g' "$CLAUDE_MD_PATH"
-            ;;
-    esac
+    return 0
 }
 
 # Show status
 show_status() {
-    local current_mode=$(check_current_mode)
-    
     echo -e "${BLUE}📋 Current Instruction Mode Status${NC}"
     echo
     
-    case "$current_mode" in
-        challenge)
-            echo -e "Current mode: ${YELLOW}CHALLENGE${NC} 🚀"
-            echo "Description: Creative, innovative, ambitious approach"
-            echo "Best for: Experimental projects, brainstorming, innovation"
-            ;;
-        stable)
-            echo -e "Current mode: ${GREEN}MINIMAL${NC} 🎯"
-            echo "Description: Simple, fast, bare minimum approach"
-            echo "Best for: Quick prototypes, basic functionality, minimal viable products"
-            ;;
-        iterative)
-            echo -e "Current mode: ${BLUE}ITERATIVE${NC} 🔄"
-            echo "Description: Agile, documented, user-focused development"
-            echo "Best for: User-centered projects, documentation-heavy, long-term development"
-            ;;
-        unknown)
-            echo -e "Current mode: ${RED}UNKNOWN${NC} ❓"
-            echo "CLAUDE.md exists but mode cannot be determined"
-            ;;
-        none)
-            echo -e "Current mode: ${RED}NONE${NC} ❌"
-            echo "CLAUDE.md not found"
-            ;;
-    esac
+    local overall_mode="consistent"
+    local first_mode=""
+
+    for md_file in "${INSTRUCTION_MD_FILES[@]}"; do
+        local current_mode=$(check_file_mode "$md_file")
+        echo -e "  $(basename "$md_file"): ${YELLOW}${current_mode^^}${NC}" # 大文字で表示
+
+        if [[ -z "$first_mode" ]]; then
+            first_mode="$current_mode"
+        elif [[ "$first_mode" != "$current_mode" ]]; then
+            overall_mode="inconsistent"
+        fi
+    done
+
+    echo
+    if [[ "$overall_mode" == "consistent" ]]; then
+        echo -e "Overall Mode: ${GREEN}${first_mode^^}${NC} (Consistent across all files)"
+    else
+        echo -e "${RED}Overall Mode: INCONSISTENT${NC} (Modes differ between files)"
+        echo -e "${YELLOW}Warning: It is recommended to keep all instruction files in the same mode.${NC}"
+    fi
     
     echo
     echo -e "${BLUE}Available instruction sets:${NC}"
@@ -183,18 +189,30 @@ case "$MODE" in
 esac
 
 # Get current mode before change
-current_mode=$(check_current_mode)
+# Note: This will only check the first file in INSTRUCTION_MD_FILES for simplicity
+current_mode=$(check_file_mode "${INSTRUCTION_MD_FILES[0]}")
 
 echo -e "${BLUE}🔧 Switching instruction mode to: ${YELLOW}$MODE${NC}"
 echo
 
-# Update CLAUDE.md
-update_claude_md "$MODE"
+# Update instruction MD files
+if ! update_instruction_md_files "$MODE"; then
+    echo -e "${RED}❌ Failed to update one or more instruction files.${NC}" >&2
+    exit 1
+fi
 
-# Verify the change
-new_mode=$(check_current_mode)
-if [[ "$new_mode" == "$MODE" ]]; then
-    echo -e "${GREEN}✅ Successfully switched to $MODE mode${NC}"
+# Verify the change (check all files for consistency)
+new_mode_status="consistent"
+for md_file in "${INSTRUCTION_MD_FILES[@]}"; do
+    local file_new_mode=$(check_file_mode "$md_file")
+    if [[ "$file_new_mode" != "$MODE" ]]; then
+        new_mode_status="inconsistent"
+        break
+    fi
+done
+
+if [[ "$new_mode_status" == "consistent" ]]; then
+    echo -e "${GREEN}✅ Successfully switched to $MODE mode for all instruction files.${NC}"
     echo
     
     case "$MODE" in
@@ -222,19 +240,22 @@ if [[ "$new_mode" == "$MODE" ]]; then
     esac
     
     echo
-    echo -e "${BLUE}📝 CLAUDE.md has been updated${NC}"
-    echo "  Previous mode: $current_mode"
-    echo "  New mode: $new_mode"
-    echo "  Backup created: backups/claude-md/CLAUDE.md.backup.$(date +%Y%m%d_%H%M%S)"
+    echo -e "${BLUE}📝 Instruction files updated:${NC}"
+    for md_file in "${INSTRUCTION_MD_FILES[@]}"; do
+        echo "  - $(basename "$md_file")"
+    done
+    echo "  Previous mode (based on first file): $current_mode"
+    echo "  New mode: $MODE"
+    echo "  Backups created in respective 'backups' directories."
     
 else
-    echo -e "${RED}❌ Failed to switch mode${NC}" >&2
-    echo "Expected: $MODE, Got: $new_mode"
+    echo -e "${RED}❌ Failed to switch mode consistently across all files.${NC}" >&2
+    echo "Expected: $MODE, But some files did not update correctly."
+    show_status # 不整合な状態を表示
     exit 1
 fi
 
 echo
 echo -e "${BLUE}🔄 Next steps:${NC}"
-echo "  1. Restart Claude sessions for the changes to take effect"
-echo "  2. Use ./bin/setup to restart all agents"
-echo "  3. Verify the new instructions are loaded correctly"
+echo "  1. Restart AI agent sessions for the changes to take effect (e.g., ./bin/claude-startup or ./bin/gemini-startup)"
+echo "  2. Verify the new instructions are loaded correctly"
